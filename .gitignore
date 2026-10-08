@@ -1,0 +1,40 @@
+# Personal, never committed: home location, LAN addresses, ports
+LOCAL.md
+local.config
+*.local.json
+
+# Android / Gradle
+.gradle/
+build/
+*/build/
+local.properties
+captures/
+*.apk
+*.aab
+*.dex
+
+# Signing material
+*.jks
+*.keystore
+keystore.properties
+
+# Editors / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Spike recordings (large; findings live in private/docs/spikes/)
+recordings/
+
+# Claude Code per-user settings
+.claude/settings.local.json
+
+# Build output
+dist/
+__pycache__/
+*.pyc
+tools/lib/
+
+# Review screenshots (regenerate with scripts/review-screens.mjs)
+private/docs/review/screens/

@@ -1,0 +1,111 @@
+/* Everything is sized in --px (1/480 of the viewport height) so the layout holds at
+   other sizes. Flat, dark by construction: Kiosk Satellite owns dimming. */
+:root {
+  --px: calc(100vh / 480);
+  --bg: #0b0f14;
+  --fg: #e8eef5;
+  --dim: #cdd8e3;
+  --line: #3a4a5c;
+  --accent: #5cc8ff;
+  --hot: #ffcf5c;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { display: grid; grid-template-columns: 1fr calc(352 * var(--px)); grid-template-rows: calc(88 * var(--px)) 1fr;
+  column-gap: calc(24 * var(--px)); row-gap: calc(8 * var(--px)); width: 100%; height: 100%; padding: calc(16 * var(--px)); }
+/* Top band: the featured aircraft on the left, our own clock on the right. */
+#band { grid-column: 1 / -1; display: flex; align-items: center; gap: calc(16 * var(--px));
+  border-bottom: calc(1 * var(--px)) solid var(--line); padding-bottom: calc(8 * var(--px)); }
+#clock { flex: 0 0 calc(200 * var(--px)); text-align: right; }
+#time { font-size: calc(40 * var(--px)); font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#date { font-size: calc(20 * var(--px)); color: var(--dim); white-space: nowrap; }
+#left { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+#right { width: calc(352 * var(--px)); height: calc(352 * var(--px)); align-self: end; }
+#scope { width: 100%; height: 100%; display: block; }
+
+#rows { position: relative; list-style: none; display: flex; flex-direction: column; gap: calc(6 * var(--px)); margin-top: auto; /* bottom-aligned */ }
+#rows li { display: grid; grid-template-columns: 1fr calc(150 * var(--px)); align-items: center;
+  column-gap: calc(6 * var(--px)); height: calc(74 * var(--px));
+  padding: 0; /* flush with the band and footer: one left edge */ border-radius: calc(6 * var(--px)); }
+/* Position older than the renderer trusts (dead-reckoning cap): eased to .55 by the staledim animation. */
+@keyframes staledim { to { opacity: .55; } }
+.rt { margin-left: calc(12 * var(--px)); font-size: calc(24 * var(--px)); font-weight: 600; color: var(--dim); white-space: nowrap; }
+.main { min-width: 0; }
+.name { font-size: calc(28 * var(--px)); font-weight: 600; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { font-size: calc(20 * var(--px)); color: var(--dim); height: calc(23 * var(--px)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: calc(4 * var(--px)); }
+.side { text-align: right; white-space: nowrap; }
+.alt { font-size: calc(28 * var(--px)); font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.arrow { display: inline-block; width: calc(28 * var(--px)); font-size: calc(24 * var(--px)); color: var(--accent); text-align: center; vertical-align: 12%; }
+.dist { font-size: calc(20 * var(--px)); color: var(--dim); height: calc(23 * var(--px)); font-variant-numeric: tabular-nums; }
+
+#spot { flex: 1 1 0; min-width: 0; overflow: hidden; display: grid; grid-template-columns: 1fr;
+  align-items: center; }
+#spot .msg { grid-column: 1 / -1; }
+#spot .head { display: flex; align-items: baseline; gap: calc(12 * var(--px)); }
+.chip { padding: calc(2 * var(--px)) calc(10 * var(--px)); border-radius: calc(6 * var(--px)); font-size: calc(20 * var(--px));
+  font-weight: 700; letter-spacing: .04em; color: #0b0f14; }
+.ident { font-size: calc(30 * var(--px)); font-weight: 700; white-space: nowrap; }
+.chip.ident { font-size: calc(28 * var(--px)); padding: calc(1 * var(--px)) calc(12 * var(--px)); border-radius: calc(8 * var(--px)); letter-spacing: .02em; }
+.route { font-size: calc(26 * var(--px)); font-weight: 600; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.facts { margin-top: calc(2 * var(--px)); font-size: calc(23 * var(--px)); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg { font-size: calc(26 * var(--px)); color: var(--dim); padding-top: calc(10 * var(--px)); }
+
+footer { margin-top: calc(6 * var(--px)); display: flex; justify-content: space-between; height: calc(22 * var(--px)); font-size: calc(17 * var(--px)); color: var(--dim); }
+/* Stale data says so in the clock's place, large and in the warning colour: the one state the room needs to notice. */
+#note { display: none; }
+body.stale #date { display: none; }
+body.stale #note { display: block; color: var(--hot); font-size: calc(20 * var(--px)); font-weight: 700; white-space: nowrap; }
+#rows, #spot { transition: opacity 3s ease; } /* the feed going stale dims the page gradually */
+body.stale #rows, body.stale #spot { opacity: .8; }
+
+
+/* Callsign chips in the list: an outline in the airline colour, so the one solid chip (the
+   featured aircraft's, in the band) is the loudest thing. The icon is plain white. */
+.lchip { display: inline-block; padding: calc(0 * var(--px)) calc(10 * var(--px)); border-radius: calc(7 * var(--px));
+  background: transparent; color: var(--fg); box-shadow: inset 0 0 0 calc(2 * var(--px)) var(--bg);
+  font-size: calc(24 * var(--px)); font-weight: 700; letter-spacing: .02em; line-height: 1.25; }
+
+/* Featured band: the type icon sits inside the callsign chip. */
+.inchip { width: calc(26 * var(--px)); height: calc(26 * var(--px)); margin-right: calc(7 * var(--px)); vertical-align: calc(-4 * var(--px)); }
+.lchip .inchip { width: calc(22 * var(--px)); height: calc(22 * var(--px)); margin-right: calc(6 * var(--px)); vertical-align: calc(-3 * var(--px)); }
+
+/* Changed content fades in over what was there (docs/payload.md, Transitions). */
+/* Out then in, not both at once: a simultaneous cross-fade shows two texts overprinted at half
+   strength mid-way. The old content is gone by the half-way point; the new one appears after it. */
+@keyframes fadein { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes fadeout { 0% { opacity: 1; } 45%, 100% { opacity: 0; } }
+#rows li.ghost { position: absolute; left: 0; right: 0; pointer-events: none; }
+#spot { position: relative; }
+#spot .spotghost { position: absolute; inset: 0; display: grid; align-items: center; pointer-events: none; }
+
+/* One aircraft: it moves from the band into the empty left side, in large type. */
+#solo { display: none; }
+body.solo #solo { display: flex; flex: 1 1 0; min-height: 0; align-items: center; }
+body.solo #spot { visibility: hidden; }
+.solobody { min-width: 0; }
+.solobody .chip.ident { font-size: calc(44 * var(--px)); padding: calc(2 * var(--px)) calc(16 * var(--px)); border-radius: calc(10 * var(--px)); display: inline-block; }
+.solobody .inchip { width: calc(40 * var(--px)); height: calc(40 * var(--px)); margin-right: calc(10 * var(--px)); vertical-align: calc(-6 * var(--px)); }
+.sroute { margin-top: calc(10 * var(--px)); font-size: calc(40 * var(--px)); font-weight: 600; white-space: nowrap; }
+.salt { margin-top: calc(10 * var(--px)); font-size: calc(56 * var(--px)); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.salt .arrow { width: calc(40 * var(--px)); font-size: calc(36 * var(--px)); }
+.sdist { font-size: calc(28 * var(--px)); color: var(--dim); font-variant-numeric: tabular-nums; }
+.swho { margin-top: calc(8 * var(--px)); font-size: calc(22 * var(--px)); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Empty sky: a calm message on the left, a small scene drawn above it (render.js, drift). */
+#calm { display: none; }
+body.empty #calm { display: flex; flex: 1 1 0; min-height: 0; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+body.empty #rows { display: none; }
+.sky { width: 100%; height: calc(110 * var(--px)); margin-bottom: calc(10 * var(--px)); }
+#drift { width: 100%; height: 100%; display: block; }
+.ctitle { font-size: calc(40 * var(--px)); font-weight: 300; letter-spacing: .06em; color: var(--dim); }
+.cdetail { margin-top: calc(6 * var(--px)); font-size: calc(21 * var(--px)); font-weight: 300; color: #8393a5; }
+
+/* The scope recedes while the sky is quiet; it eases back when an aircraft appears. */
+#right { transition: opacity 3s ease; }
+body.empty #right { opacity: .5; }
+/* An unconfirmed route (origin only) is lighter and slanted, so it reads as less certain than a full route. */
+.rt.unc, .route.unc, .sub .unc, .facts .unc { font-weight: 500; font-style: italic; color: #9fb0c2; }
+/* No identity to show (a ~ target): the chip steps back; altitude and distance stay at full strength. */
+.chip.faint, .lchip.faint { opacity: .7; }
+.rarrow { width: 0.95em; height: 0.58em; margin: 0 0.3em; vertical-align: -0.02em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }

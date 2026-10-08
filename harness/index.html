@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flights harness</title>
+<style>
+  body { font: 14px system-ui, sans-serif; background: #222; color: #ddd; margin: 12px; }
+  #bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 10px; }
+  #stage { width: 960px; height: 480px; background: #000; }
+  iframe { width: 960px; height: 480px; border: 0; display: block; }
+  button, select, input { font: inherit; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <label>Fixture <select id="fx"></select></label>
+  <button id="pub">Simulate publish</button>
+  <label>Auto-publish <select id="auto"><option value="0">off</option><option value="3">3 s</option><option value="10" selected>10 s</option></select></label>
+  <label>Payload age (s) <input id="age" type="number" value="0" min="0" style="width:5em"></label>
+  <label><input type="checkbox" id="ksfoot"> KS widget footprint</label>
+  <label><input type="checkbox" id="outl"> Outlined list chips</label>
+  <span id="info"></span>
+</div>
+<div id="stage" style="position:relative"><iframe id="frame"></iframe>
+  <div id="ksw" style="display:none;position:absolute;left:25px;top:40px;width:130px;height:78px;border:1px dashed #f66;color:#f66;font:12px sans-serif;pointer-events:none">KS weather widget (measured on the Show)</div>
+</div>
+<script>
+// Mirrors what the plugin does: take the page, substitute the payload for the marker,
+// and replace the whole document. `gen` is rewritten to "now" (minus the chosen age)
+// so the fixtures behave as if Java had just encoded them.
+const $ = (id) => document.getElementById(id);
+const BASE = '../assets/flights/';
+let page = null, payload = null, timer = null, publishes = 0;
+
+async function boot() {
+  page = await (await fetch(BASE + 'index.html')).text();
+  const names = await (await fetch('../fixtures/payload/index.json')).json();
+  $('fx').innerHTML = names.map((n) => '<option>' + n + '</option>').join('');
+  $('fx').value = new URLSearchParams(location.search).get('fx') || 'normal-4';
+  await load();
+}
+async function load() {
+  payload = await (await fetch('../fixtures/payload/' + $('fx').value + '.json')).json();
+  publish();
+}
+function publish() {
+  const p = { ...payload, gen: Date.now() - Number($('age').value) * 1000 };
+  const json = JSON.stringify(p).replace(/</g, '\\u003c');
+  const html = page.replace('<head>', '<head><base href="' + new URL(BASE, location.href).href + '">')
+    .replace('/*PAYLOAD*/', () => json);
+  $('frame').srcdoc = html; // a new document each time, like a publish
+  publishes++;
+  $('info').textContent = 'publishes: ' + publishes + ' · ' + json.length + ' B';
+}
+$('fx').onchange = load;
+$('pub').onclick = publish;
+$('age').onchange = publish;
+$('auto').onchange = () => {
+  clearInterval(timer);
+  if (Number($('auto').value)) timer = setInterval(publish, Number($('auto').value) * 1000);
+};
+$('ksfoot').onchange = () => { $('ksw').style.display = $('ksfoot').checked ? 'block' : 'none'; };
+// Every publish is a new document, so re-apply the chip style when it loads.
+const applyChips = () => { try { $('frame').contentDocument.getElementById('rows').classList.toggle('outline', $('outl').checked); } catch (e) { /* frame not ready */ } };
+$('frame').addEventListener('load', applyChips);
+$('outl').onchange = applyChips;
+boot().then(() => $('auto').onchange());
+</script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "id": "nearby-flights",
+  "name": "Nearby Flights",
+  "version": "0.1.65",
+  "apiVersion": 1,
+  "minAndroidSdk": 24,
+  "entryClass": "me.jxl.kiosk.plugins.flights.FlightsPlugin",
+  "description": "Nearby Flights screensaver: a list and a scope of the aircraft overhead, from your own receiver or adsb.lol.",
+  "author": "Mike Janofsky",
+  "license": "Apache-2.0",
+  "capabilities": [
+    "screensaver",
+    "host.read"
+  ],
+  "settings": [
+    {
+      "key": "homeLat",
+      "title": "Home latitude",
+      "type": "string",
+      "default": "",
+      "group": "Location",
+      "description": "Decimal degrees, e.g. 27.1234. Negative is south."
+    },
+    {
+      "key": "homeLon",
+      "title": "Home longitude",
+      "type": "string",
+      "default": "",
+      "group": "Location",
+      "description": "Decimal degrees, e.g. -82.1234. Negative is west."
+    },
+    {
+      "key": "radiusNm",
+      "title": "Radius (nm)",
+      "type": "number",
+      "min": 5,
+      "max": 50,
+      "step": 1,
+      "default": 15,
+      "group": "Location"
+    },
+    {
+      "key": "widenMode",
+      "title": "Radius limit",
+      "type": "select",
+      "options": [
+        "Hard",
+        "Soft"
+      ],
+      "default": "Hard",
+      "group": "Location",
+      "description": "Hard: never show aircraft beyond the radius. Soft: reach farther while the list has empty rows."
+    },
+    {
+      "key": "maxRadiusNm",
+      "title": "Soft reach (nm)",
+      "type": "number",
+      "min": 5,
+      "max": 250,
+      "step": 5,
+      "default": 60,
+      "group": "Location",
+      "description": "How far Soft may reach. Ignored when Radius limit is Hard."
+    },
+    {
+      "key": "units",
+      "title": "Units",
+      "type": "select",
+      "options": [
+        "Aviation",
+        "Metric",
+        "Imperial"
+      ],
+      "default": "Aviation",
+      "group": "Display",
+      "description": "Aviation: nm, ft. Metric: km, m. Imperial: mi, ft."
+    },
+    {
+      "key": "maxRows",
+      "title": "Rows",
+      "type": "number",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 4,
+      "group": "Display",
+      "description": "List rows below the featured aircraft (the top band)."
+    },
+    {
+      "key": "excludeGa",
+      "title": "Hide general aviation",
+      "type": "boolean",
+      "default": false,
+      "group": "Display",
+      "description": "Hides light aircraft, helicopters and bare-registration callsigns."
+    },
+    {
+      "key": "demoQuiet",
+      "title": "Demo: quiet sky",
+      "type": "boolean",
+      "default": false,
+      "group": "Display",
+      "description": "Always show the empty-sky screen, to preview it. Turn off for normal use."
+    },
+    {
+      "key": "primarySource",
+      "title": "Primary source",
+      "type": "select",
+      "options": [
+        "Local feed",
+        "adsb.lol",
+        "Local + adsb.lol"
+      ],
+      "default": "Local feed",
+      "description": "Local + adsb.lol asks both every refresh and merges them: a home antenna hears only part of the traffic.",
+      "group": "Sources"
+    },
+    {
+      "key": "localUrl",
+      "title": "Local feed URL",
+      "type": "string",
+      "default": "",
+      "group": "Sources",
+      "description": "The readsb/tar1090 aircraft.json address, e.g. http://host:port/data/aircraft.json."
+    },
+    {
+      "key": "fallbackSource",
+      "title": "Fallback source",
+      "type": "select",
+      "options": [
+        "adsb.lol",
+        "Local feed",
+        "None"
+      ],
+      "default": "adsb.lol",
+      "group": "Sources",
+      "description": "Used when the primary source is unavailable. adsb.lol data is ODbL; see the README."
+    },
+    {
+      "key": "refreshSec",
+      "title": "Refresh (s)",
+      "type": "number",
+      "min": 5,
+      "max": 60,
+      "step": 5,
+      "default": 10,
+      "group": "Sources",
+      "description": "Seconds between position updates."
+    }
+  ]
+}
