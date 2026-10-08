@@ -1,0 +1,40 @@
+name: Bug report
+description: Something looks wrong or doesn't work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please leave out your home coordinates, ZIP and local network addresses. Describing the area ("a few miles from a big airport") is enough.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin version
+      placeholder: "0.9.0"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Kiosk Satellite version
+      placeholder: "Echo Show 5, Kiosk Satellite x.y"
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Position source
+      options: [Local feed, adsb.lol, Local + adsb.lol, Not sure]
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshot or status line
+      description: A photo of the screen helps. The status line shows in Kiosk Satellite's remote web UI.

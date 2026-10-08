@@ -1,0 +1,22 @@
+name: Device report
+description: Tell us how it looks on your screen
+labels: [device]
+body:
+  - type: input
+    id: device
+    attributes:
+      label: Device, screen size and orientation
+      placeholder: "Fire HD 10, 1920x1200, landscape"
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: How does it look?
+      options: [Works well, Mostly fine, Something is clipped or overlapping, Doesn't work]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes or a photo
