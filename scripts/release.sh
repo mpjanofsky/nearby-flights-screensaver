@@ -1,12 +1,14 @@
 #!/bin/bash
 # Builds a release package from a clean tree and tags it. Usage: scripts/release.sh 1.0.0
-# The version is the tag (vX.Y.Z); tools/build.py stamps it into the package manifest, so the
-# checked-in manifest version is only the dev default. Nothing is pushed anywhere.
+# The version is the tag (vX.Y.Z) and must equal the checked-in manifest version: Kiosk Satellite
+# reads the manifest from the repo and wants a release asset named for that version.
+# Nothing is pushed anywhere.
 set -eu
 cd "$(dirname "$0")/.."
 v=${1:-}
 [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "usage: scripts/release.sh MAJOR.MINOR.PATCH" >&2; exit 2; }
 tag="v$v"
+grep -q "\"version\": \"$v\"" kiosk-satellite-plugin.json || { echo "kiosk-satellite-plugin.json version is not $v; bump it and commit first" >&2; exit 1; }
 git rev-parse -q --verify "refs/tags/$tag" >/dev/null && { echo "tag $tag already exists" >&2; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "working tree is not clean; commit or stash first" >&2; exit 1; }
 scripts/check.sh || { echo "check.sh failed; not releasing" >&2; exit 1; }
