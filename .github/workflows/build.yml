@@ -41,7 +41,8 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" >/dev/null
 
       - name: Check the manifest version matches the tag
-        run: grep -q "\"version\": \"${TAG#v}\"" kiosk-satellite-plugin.json
+        run: |
+          grep -q "\"version\": \"${TAG#v}\"" kiosk-satellite-plugin.json
 
       - name: Test
         run: scripts/check.sh
