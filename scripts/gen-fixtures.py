@@ -98,6 +98,8 @@ fx = {
     "rows-2": base(normal[:2]),
     "rows-3": base(normal[:3]),
     "empty": base([]),
+    "clock-12": base([], clock="12"),
+    "clock-24": base([], clock="24"),
     "stale": base(normal, st=True, fa=150.0),
     "idle": base([], fa=None, idle=True),  # fetching paused while the screensaver is hidden
     "settings-error": base([], ap=[], msg="Set your home latitude and longitude"),

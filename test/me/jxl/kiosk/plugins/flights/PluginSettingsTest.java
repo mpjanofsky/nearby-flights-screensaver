@@ -120,4 +120,35 @@ class PluginSettingsTest {
     }
     org.junit.jupiter.api.Assertions.assertEquals(0, m.getJSONArray("ac").length());
   }
+
+  @Test
+  void clockFormatReachesThePayloadAndSurvivesWidening() throws Exception {
+    Map<String, Object> m = ok();
+    for (String label : new String[] {"12 hour", "24 hour"}) {
+      m.put("clockFormat", label);
+      Config c = PluginSettings.parse(m).config.withRadius(60 * 1852.0);
+      org.json.JSONObject p =
+          new org.json.JSONObject(
+              PayloadEncoder.encode(
+                  java.util.Collections.emptyList(),
+                  c,
+                  new PayloadEncoder.Health(0, false, "local"),
+                  1,
+                  1));
+      assertEquals(label.substring(0, 2), p.getString("clock"));
+    }
+    for (String label : new String[] {"Device default", "unknown"}) {
+      m.put("clockFormat", label);
+      Config c = PluginSettings.parse(m).config;
+      assertFalse(
+          new org.json.JSONObject(
+                  PayloadEncoder.encode(
+                      java.util.Collections.emptyList(),
+                      c,
+                      new PayloadEncoder.Health(0, false, "local"),
+                      1,
+                      1))
+              .has("clock"));
+    }
+  }
 }

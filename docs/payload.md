@@ -38,6 +38,7 @@ inside the JSON. Each publish is a new document and the page is sandboxed (opaqu
 | `src` | `"local"`\|`"net"`\|`"mix"` | Active source, for the footer indicator. `mix` = both feeds merged (added 2026-10-07, additive: an older renderer would reject it). |
 | `r` | number | Radius in metres. Blips beyond it are not drawn. |
 | `u` | `"av"`\|`"met"`\|`"imp"` | Display units: aviation (nm, ft, kt), metric (km, m, km/h), imperial (mi, ft, mph). |
+| `clock` | `"12"`\|`"24"`\|omitted | Clock hour cycle. Omitted follows the device locale; `"24"` uses 00 at midnight. Device time zone and date format are unchanged. Additive: no version bump. |
 | `ft` | string\|omitted | Id of the featured aircraft (the top band). Must match an `ac[].id`; the renderer falls back to the first row if it does not or if `ft` is absent. |
 | `pn` | int\|omitted | Transition (below): how many list rows (not counting the featured aircraft) the previous publish showed. Omitted on the first publish: nothing to animate from. |
 | `msg` | string\|omitted | A calm one-line message shown in place of the aircraft (used for a settings problem Java cannot fix by retrying). Sent with `ac` empty; the renderer shows it in the top band and the stale treatment is not applied. Additive: no version bump. |

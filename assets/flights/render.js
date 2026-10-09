@@ -168,9 +168,9 @@
       });
     }
 
-    // Own clock: the device's time zone and locale decide 12/24 h, so no setting is needed.
+    // Own clock: keep the device's time zone and locale, with an optional hour-cycle override.
     const d = new Date(now);
-    $('time').textContent = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    $('time').textContent = FL.fmtClock(d, P && P.clock);
     $('date').textContent = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
     const solo = list.length === 1 && P && !P.msg;

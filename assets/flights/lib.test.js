@@ -263,3 +263,25 @@ test('status: a message from Java replaces the aircraft', () => {
   assert.deepEqual(FL.status(p, 1000), { kind: 'msg', text: 'Set your home latitude and longitude' });
   assert.ok(FL.validate({ ...p, msg: 5 }).length > 0);
 });
+
+
+test('clock selection overrides the device locale and handles midnight and noon', () => {
+  for (const [hour, minute, twelve, twentyFour] of [
+    [0, 5, '12:05 AM', '00:05'], [12, 0, '12:00 PM', '12:00'],
+    [13, 9, '1:09 PM', '13:09'], [23, 59, '11:59 PM', '23:59'],
+  ]) {
+    const d = new Date(2026, 0, 1, hour, minute);
+    assert.equal(FL.fmtClock(d, '12', 'en-US'), twelve);
+    assert.equal(FL.fmtClock(d, '24', 'en-US'), twentyFour);
+  }
+  const d = new Date(2026, 0, 1, 13, 9);
+  assert.equal(FL.fmtClock(d, undefined, 'en-US'), d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
+  assert.equal(FL.fmtClock(d, '12', 'en-GB'), '1:09 pm');
+  assert.equal(FL.fmtClock(new Date(2026, 0, 1, 0, 5), '24', 'en-GB'), '00:05');
+});
+
+test('clock payload format is optional and restricted to 12 or 24', () => {
+  const p = load('empty');
+  for (const clock of ['12', '24']) assert.deepEqual(FL.validate({ ...p, clock }), []);
+  for (const clock of ['invalid', 24, null]) assert.ok(FL.validate({ ...p, clock }).length);
+});

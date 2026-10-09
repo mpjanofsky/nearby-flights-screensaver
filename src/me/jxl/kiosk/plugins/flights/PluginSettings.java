@@ -71,9 +71,16 @@ public final class PluginSettings {
             Boolean.TRUE.equals(m.get("excludeGa")),
             widen,
             maxRadiusNm * 1852.0,
-            Boolean.TRUE.equals(m.get("demoQuiet")));
+            Boolean.TRUE.equals(m.get("demoQuiet")),
+            clockCode(str(m.get("clockFormat"), "Device default")));
     return new PluginSettings(
         c, primary, fallback, url, (long) num(m.get("refreshSec"), 10, 5, 60) * 1000L, err);
+  }
+
+  private static String clockCode(String label) {
+    if ("12 hour".equals(label)) return "12";
+    if ("24 hour".equals(label)) return "24";
+    return null;
   }
 
   private static Config.Widen widenMode(String label) {
