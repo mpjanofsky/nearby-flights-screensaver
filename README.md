@@ -122,6 +122,7 @@ Open the plugin's row in Plugin Manager. Changes apply straight away.
 | Setting | Default | What it does |
 |---|---|---|
 | Units | Aviation | **Aviation** (nautical miles, feet), **Metric** (km, m) or **Imperial** (miles, feet). |
+| Clock format | Device default | Follow the device locale, or choose **12 hour** or **24 hour**. Uses the device time zone. |
 | Rows | 4 | List rows under the top band, 1 to 4. |
 | Hide general aviation | off | Hides light aircraft, helicopters and bare-registration callsigns. |
 | Demo: quiet sky | off | Always shows the empty-sky screen. |

@@ -95,6 +95,7 @@ public final class PayloadEncoder {
     s.append(",\"src\":").append(str(h.sourceId));
     s.append(",\"r\":").append(Math.round(c.radiusM));
     s.append(",\"u\":").append(str(c.units));
+    if (c.clockFormat != null) s.append(",\"clock\":").append(str(c.clockFormat));
     if (featuredId != null) s.append(",\"ft\":").append(str(featuredId));
     if (change != null) s.append(",\"pn\":").append(change.previousListRows);
     s.append(",\"ac\":[");

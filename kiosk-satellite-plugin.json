@@ -77,6 +77,19 @@
       "description": "Aviation: nm, ft. Metric: km, m. Imperial: mi, ft."
     },
     {
+      "key": "clockFormat",
+      "title": "Clock format",
+      "type": "select",
+      "options": [
+        "Device default",
+        "12 hour",
+        "24 hour"
+      ],
+      "default": "Device default",
+      "group": "Display",
+      "description": "Use the device locale or choose a 12-hour or 24-hour clock. The device time zone is unchanged."
+    },
+    {
       "key": "maxRows",
       "title": "Rows",
       "type": "number",

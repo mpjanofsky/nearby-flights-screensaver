@@ -4,6 +4,10 @@ package me.jxl.kiosk.plugins.flights;
 /** User settings the pipeline needs. Home is exact; it must never be logged or published. */
 public final class Config {
   public final double homeLat, homeLon, radiusM;
+
+  /** Clock override: "12", "24", or null for the device locale. */
+  public final String clockFormat;
+
   public final String units; // "av" | "met" | "imp"
   public final int maxRows; // 1..4: list rows, not counting the featured aircraft
   public final boolean excludeGa;
@@ -57,6 +61,21 @@ public final class Config {
       Widen widen,
       double maxRadiusM,
       boolean demoQuiet) {
+    this(homeLat, homeLon, radiusM, units, maxRows, excludeGa, widen, maxRadiusM, demoQuiet, null);
+  }
+
+  public Config(
+      double homeLat,
+      double homeLon,
+      double radiusM,
+      String units,
+      int maxRows,
+      boolean excludeGa,
+      Widen widen,
+      double maxRadiusM,
+      boolean demoQuiet,
+      String clockFormat) {
+    this.clockFormat = clockFormat;
     this.demoQuiet = demoQuiet;
     this.homeLat = homeLat;
     this.homeLon = homeLon;
@@ -71,7 +90,16 @@ public final class Config {
   /** Same settings at another radius (the widened one); the widen limit is unchanged. */
   public Config withRadius(double newRadiusM) {
     return new Config(
-        homeLat, homeLon, newRadiusM, units, maxRows, excludeGa, widen, maxRadiusM, demoQuiet);
+        homeLat,
+        homeLon,
+        newRadiusM,
+        units,
+        maxRows,
+        excludeGa,
+        widen,
+        maxRadiusM,
+        demoQuiet,
+        clockFormat);
   }
 
   /** Aircraft to publish: the featured one (shown in the top band) plus the list rows. */

@@ -33,6 +33,7 @@
     if (p.src !== 'local' && p.src !== 'net' && p.src !== 'mix') e.push('src must be local|net|mix');
     if (!(isNum(p.r) && p.r > 0)) e.push('r must be > 0');
     if (!UNITS[p.u]) e.push('u must be av|met|imp');
+    if (!(p.clock === undefined || p.clock === '12' || p.clock === '24')) e.push('clock must be 12|24');
     if (!optStr(p.ft)) e.push('ft must be a string');
     if (!optStr(p.msg)) e.push('msg must be a string');
     if (!(p.idle === undefined || typeof p.idle === 'boolean')) e.push('idle must be boolean');
@@ -62,6 +63,17 @@
       const ok = Array.isArray(a.tr) && a.tr.every((t) => Array.isArray(t) && t.length === 3 && t.every(isNum));
       if (!ok) e.push(at + '.tr must be [[age,x,y],...]');
     }
+  }
+
+  // Keep the device locale/time zone; override only its hour cycle when requested.
+  function fmtClock(date, clock, locale) {
+    const options = { hour: 'numeric', minute: '2-digit' };
+    if (clock === '12') options.hour12 = true;
+    if (clock === '24') {
+      options.hour = '2-digit';
+      options.hourCycle = 'h23'; // midnight is 00, never 24
+    }
+    return date.toLocaleTimeString(locale || [], options);
   }
 
   // Seconds since the observation, at nowMs.
@@ -400,6 +412,6 @@
   return {
     VERSION, ALT_TOP_M, altColor, iconFor, airlineColor, iconColor, luminance, BRAND_COLOR, typeName, typeLabel, DR_CAP_S, UNITS,
     validate, ageNow, position, trail, polar, cardinal, trend,
-    fmtDist, fmtAlt, fmtSpeed, ringPlan, sweepAngle, spread, featuredId, status, rows, makeRow, transition, spotlight, routeText, isUnidentified, chipHue,
+    fmtClock, fmtDist, fmtAlt, fmtSpeed, ringPlan, sweepAngle, spread, featuredId, status, rows, makeRow, transition, spotlight, routeText, isUnidentified, chipHue,
   };
 });
