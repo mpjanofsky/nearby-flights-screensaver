@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "nearby-flights",
   "name": "Nearby Flights",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "apiVersion": 1,
   "minAndroidSdk": 24,
   "entryClass": "me.jxl.kiosk.plugins.flights.FlightsPlugin",
