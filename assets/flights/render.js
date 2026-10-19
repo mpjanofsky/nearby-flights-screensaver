@@ -47,6 +47,7 @@
   const $ = (id) => document.getElementById(id);
 
   const ROW_PITCH = 80; // list row height plus gap, in --px units (style.css)
+  const GLIDE_MS = 1000; // a blip slides from where the last page drew it to its fresh fix
   const FADE_MS = 1000; // a change of content fades in over the old one instead of switching
   const STALE_MS = 3000; // an old position eases to its dim look instead of switching to it
   let t0 = performance.now(); // reset at the first painted frame (see frame())
@@ -408,17 +409,39 @@
       placed.push({ x0: px(ap.x) - 16, x1: px(ap.x) + 16, y: py(ap.y) + 8, h: 14 });
     });
 
+    const elapsed = performance.now() - t0;
     const { list, closest } = FL.rows(P, now);
+    const slide = list.map((row) => FL.glide(row.ac, elapsed, GLIDE_MS));
+    const full = list.map((row) => FL.glide(row.ac, 0, GLIDE_MS)); // the whole offset, as the last page still showed it
+    const base = list.map((row) => ({ x: row.pos.x, y: row.pos.y }));
+    list.forEach((row, i) => { row.pos = { ...row.pos, x: row.pos.x + slide[i].x, y: row.pos.y + slide[i].y }; });
+    const ring = (q) => { // keep every icon centre on or inside the ring, so each listed aircraft is drawn
+      const d = Math.hypot(q.x - c, q.y - c);
+      return d > R ? { x: c + ((q.x - c) * R) / d, y: c + ((q.y - c) * R) / d } : q;
+    };
     // Declutter: close aircraft are nudged apart, by at most DECLUTTER_MAX_FRAC of the scope, so an
     // icon stays on its true spot to within about a nautical mile and the list's distances agree
     // with the scope. Pairs closer than that overlap; their labels are separated instead (below).
     // Deterministic from the positions, so it needs no state and a recreated document looks the same.
     const shown = FL.spread(
       list.map((row) => ({ x: px(row.pos.x), y: py(row.pos.y) })), size * 0.13, size * DECLUTTER_MAX_FRAC)
-      .map((q) => { // keep every icon centre on or inside the ring, so each listed aircraft is drawn
-        const d = Math.hypot(q.x - c, q.y - c);
-        return d > R ? { x: c + ((q.x - c) * R) / d, y: c + ((q.y - c) * R) / d } : q;
+      .map(ring);
+    // A neighbour that came or went changes the nudge, and the page is new, so state is not kept:
+    // rebuild the previous layout (aircraft that stay, plus `gone`, all where the last page had them)
+    // and ease the difference between its nudge and this one's out, as the blips glide.
+    const arrived = list.some((row) => !Number.isInteger(row.ac.pv)), left = (P.gone || []).length > 0;
+    if (Number.isInteger(P.pn) && (arrived || left) && elapsed < GLIDE_MS) {
+      const at = (i) => ({ x: px(base[i].x + full[i].x), y: py(base[i].y + full[i].y) });
+      const news = list.map((row, i) => ({ id: row.ac.id, ...at(i) }));
+      const olds = list.map((row, i) => (Number.isInteger(row.ac.pv) ? news[i] : null)).filter(Boolean);
+      (P.gone || []).forEach((g) => { const gp = FL.position(g, P, now); olds.push({ id: g.id, x: px(gp.x), y: py(gp.y) }); });
+      const rest = FL.nudgeResidual(olds, news, size * 0.13, size * DECLUTTER_MAX_FRAC, ring);
+      const f = FL.easeLeft(elapsed, GLIDE_MS);
+      list.forEach((row, i) => {
+        const r = rest[row.ac.id];
+        if (r) shown[i] = { x: shown[i].x + r.x * f, y: shown[i].y + r.y * f };
       });
+    }
     // Other aircraft's icons are obstacles too (an aircraft's own icon is skipped via `own`).
     shown.forEach((q, n) => placed.push({ x0: q.x - size * 0.055, x1: q.x + size * 0.055, y: q.y, h: size * 0.055, own: n }));
     const featId = FL.featuredId(P);
@@ -430,6 +453,8 @@
       const icol = FL.altColor(row.ac.alt);
       const col = icol;
       const pts = FL.trail(row.ac, P, now);
+      const head = pts[pts.length - 1]; // the live end follows the blip; older points are fixes already
+      pts[pts.length - 1] = [head[0] + slide[i].x, head[1] + slide[i].y];
       ctx.lineWidth = 2;
       for (let j = 1; j < pts.length; j++) { // fading trail, older segments fainter
         ctx.strokeStyle = col;

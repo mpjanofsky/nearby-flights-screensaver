@@ -346,8 +346,8 @@ public final class Engine {
             observedAtMs,
             shownFeatured,
             airports.within(effective.homeLat, effective.homeLon, effective.radiusM),
-            Transition.between(previous, shown));
+            Transition.between(previous, shown, nowMs, observedAtMs));
     publisher.publish(json, nowMs);
-    previous = new Transition.Snapshot(shown, shownFeatured);
+    previous = new Transition.Snapshot(shown, shownFeatured, observedAtMs);
   }
 }

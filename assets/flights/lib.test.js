@@ -285,3 +285,39 @@ test('clock payload format is optional and restricted to 12 or 24', () => {
   for (const clock of ['12', '24']) assert.deepEqual(FL.validate({ ...p, clock }), []);
   for (const clock of ['invalid', 24, null]) assert.ok(FL.validate({ ...p, clock }).length);
 });
+
+test('glide eases a stated offset out and is zero without one', () => {
+  const a = { jx: 100, jy: -40 };
+  assert.deepEqual(FL.glide(a, 0, 1000), { x: 100, y: -40 });
+  assert.deepEqual(FL.glide(a, 1000, 1000), { x: 0, y: 0 });
+  assert.deepEqual(FL.glide(a, 5000, 1000), { x: 0, y: 0 });
+  const mid = FL.glide(a, 500, 1000);
+  assert.ok(Math.abs(mid.x - 50) < 1e-9 && Math.abs(mid.y + 20) < 1e-9);
+  assert.deepEqual(FL.glide({}, 0, 1000), { x: 0, y: 0 });
+});
+
+test('validate rejects a non-numeric glide offset', () => {
+  const p = load('normal-4');
+  p.ac[0].jx = 'far';
+  assert.ok(FL.validate(p).some((m) => m.includes('jx')));
+});
+
+test('nudgeResidual: a neighbour that arrives would shove a blip; the residual is what to ease out', () => {
+  const a = { id: 'a', x: 100, y: 100 }, b = { id: 'b', x: 400, y: 400 }, c = { id: 'c', x: 110, y: 100 };
+  const same = FL.nudgeResidual([a, b], [a, b], 46, 12);
+  assert.deepEqual(same, { a: { x: 0, y: 0 }, b: { x: 0, y: 0 } });
+  const r = FL.nudgeResidual([a, b], [a, b, c], 46, 12);
+  assert.equal(r.c, undefined); // c is new: nothing to ease from
+  assert.ok(r.a.x > 1, 'a would have been pushed left by c, so the old page had it further right');
+  assert.equal(r.b.x, 0);
+  // Applying the residual at t=0 puts a back where the old page drew it.
+  const now = FL.spread([a, b, c], 46, 12);
+  assert.ok(Math.abs(now[0].x + r.a.x - a.x) < 1e-9);
+});
+
+test('nudgeResidual: an aircraft that left is gone from the result but still shoved its neighbour', () => {
+  const a = { id: 'a', x: 100, y: 100 }, g = { id: 'g', x: 110, y: 100 };
+  const r = FL.nudgeResidual([a, g], [a], 46, 12);
+  assert.ok(Math.abs(r.a.x) > 1); // the old page had a pushed away from g
+  assert.equal(r.g, undefined);
+});

@@ -78,7 +78,7 @@ abrupt change of content is what catches the eye, so changed places fade in over
   fades in over the old one (the aircraft that had `pv` 0, in `ac` or `gone`), which fades out.
 - `gone` entries with `pv` >= 1 fade out at their old place; one with `pv` 0 is the old band's content.
 - Nothing changed place and nothing came or went: no animation. A heartbeat republish is one.
-- Fading is for the list and band. Scope blips still jump to the new fix.
+- Fading is for the list and band. Scope blips glide instead: `jx`/`jy` on each aircraft is the distance the previous page's dead-reckoned blip was from the new one, and the renderer eases it out over 1 s from first paint (the same clock as the fades). The trail's live end follows the blip; older trail points do not move. The renderer also eases the declutter nudge: it rebuilds the previous layout from the aircraft that stay (at their old positions) plus `gone`, and eases the difference between the old and new nudge out over the same second, so a neighbour arriving or leaving does not shove a blip sideways. No extra payload keys.
 
 ## Renderer rules the contract implies
 

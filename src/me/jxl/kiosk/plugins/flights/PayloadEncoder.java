@@ -138,6 +138,12 @@ public final class PayloadEncoder {
     s.append(",\"a\":").append(num(Math.max(0, ageS), 1));
     if (change != null && change.previousSlot.containsKey(a.hex))
       s.append(",\"pv\":").append(change.previousSlot.get(a.hex));
+    double[] jump = change == null ? null : change.jump.get(a.hex);
+    if (jump != null && withTrail)
+      s.append(",\"jx\":")
+          .append(Math.round(jump[0]))
+          .append(",\"jy\":")
+          .append(Math.round(jump[1]));
     opt(s, "cs", a.callsign != null ? a.callsign : t.info.callsign);
     opt(s, "rg", registration(t));
     opt(s, "ty", a.type != null ? a.type : t.info.type);

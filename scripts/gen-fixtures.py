@@ -78,7 +78,7 @@ tiers = [
 # a1b2c3. Now a4d5e6 is featured (it was list slot 1), a1b2c3 dropped to the list (pv 0), 0c7f81 moved
 # up from slot 3 to 2... ab12cd is new, and f00009 left (it was slot 2, so a ghost fades out).
 moved = [
-    dict(normal[1], pv=1),
+    dict(normal[1], pv=1, jx=-900, jy=250),  # scope: the last page drew it 900 m west, 250 m north of here
     dict(normal[0], pv=0),
     dict(normal[2], pv=3),
     dict(normal[3]),

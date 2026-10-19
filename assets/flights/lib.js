@@ -56,6 +56,7 @@
     if (!a || typeof a !== 'object') return e.push(at + ' is not an object');
     if (!isStr(a.id) || !a.id) e.push(at + '.id required');
     ['x', 'y', 'a'].forEach((k) => isNum(a[k]) || e.push(at + '.' + k + ' must be a number'));
+    ['jx', 'jy'].forEach((k) => a[k] === undefined || isNum(a[k]) || e.push(at + '.' + k + ' must be a number'));
     if (!(a.pv === undefined || (Number.isInteger(a.pv) && a.pv >= 0))) e.push(at + '.pv must be an integer >= 0');
     ['alt', 'gs', 'trk', 'vr'].forEach((k) => optNum(a[k]) || e.push(at + '.' + k + ' bad type'));
     ['cs', 'rg', 'ty', 'al', 'an', 'o', 'd'].forEach((k) => optStr(a[k]) || e.push(at + '.' + k + ' bad type'));
@@ -90,6 +91,21 @@
       stale: age > DR_CAP_S,
       over: Math.max(0, age - DR_CAP_S), // seconds past the cap, so the dimming can ease in
     };
+  }
+
+  // What is left of an aircraft's scope glide `elapsedMs` after the page first painted: Java states
+  // where the previous page drew it relative to now (`jx`, `jy`, metres), and that offset eases out
+  // so the blip slides to its fresh fix. Zero once done or when nothing is stated.
+  // Fraction of an eased move still to go, `elapsedMs` into `durMs`: smoothstep, like the fades.
+  function easeLeft(elapsedMs, durMs) {
+    const t = Math.min(1, Math.max(0, elapsedMs / durMs));
+    return 1 - t * t * (3 - 2 * t);
+  }
+
+  function glide(ac, elapsedMs, durMs) {
+    if (!isNum(ac.jx) || !isNum(ac.jy)) return { x: 0, y: 0 };
+    const left = easeLeft(elapsedMs, durMs);
+    return { x: ac.jx * left || 0, y: ac.jy * left || 0 }; // || 0: never a negative zero
   }
 
   // Trail as [x, y] points oldest first, ending at the live position.
@@ -166,6 +182,26 @@
       });
     }
     return out.map((q, k) => q || pts[k]);
+  }
+
+  // How far each aircraft that was already on the scope sits from where the previous page showed it,
+  // because of the declutter alone. A neighbour that arrives or leaves changes the nudge, which would
+  // otherwise snap. `olds` and `news` are {id, x, y} in pixels at the same instant, the aircraft the
+  // previous page drew and the ones this page draws, a continuing aircraft at the same spot in both;
+  // `fix` (optional) is applied to every nudged point, as the renderer clamps to the ring. Returns
+  // {id: {x, y}} to add to the new layout and ease to zero; only aircraft in both appear.
+  function nudgeResidual(olds, news, gap, max, fix) {
+    const lay = (set) => {
+      const pts = spread(set.map((q) => ({ x: q.x, y: q.y })), gap, max).map((q) => (fix ? fix(q) : q));
+      const m = {};
+      set.forEach((q, i) => { m[q.id] = pts[i]; });
+      return m;
+    };
+    const was = lay(olds), now = lay(news), out = {};
+    news.forEach((q) => {
+      if (was[q.id]) out[q.id] = { x: was[q.id].x - now[q.id].x, y: was[q.id].y - now[q.id].y };
+    });
+    return out;
   }
 
   // 'nodata' | 'stale' | 'empty' | 'ok', with the calm line to show for it.
@@ -411,7 +447,7 @@
 
   return {
     VERSION, ALT_TOP_M, altColor, iconFor, airlineColor, iconColor, luminance, BRAND_COLOR, typeName, typeLabel, DR_CAP_S, UNITS,
-    validate, ageNow, position, trail, polar, cardinal, trend,
+    validate, ageNow, position, glide, easeLeft, nudgeResidual, trail, polar, cardinal, trend,
     fmtClock, fmtDist, fmtAlt, fmtSpeed, ringPlan, sweepAngle, spread, featuredId, status, rows, makeRow, transition, spotlight, routeText, isUnidentified, chipHue,
   };
 });
