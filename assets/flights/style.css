@@ -1,7 +1,14 @@
-/* Everything is sized in --px (1/480 of the viewport height) so the layout holds at
+/* Everything is sized in --px (one layout unit in screen pixels) so the layout holds at
    other sizes. Flat, dark by construction: Kiosk Satellite owns dimming. */
 :root {
-  --px: calc(100vh / 480);
+  /* render.js recomputes --px, --v and --scope for the real screen (landscape 960x480 units, portrait
+     540 wide); this is the landscape fallback if the script has not run. */
+  --ts: 1; /* text scale: the `ts` setting times the aspect bonus; set by render.js */
+  --tsc: 1; /* the clock and the altitude column follow the text size at half strength (they have a fixed width) */
+  --rowh: 74; /* list row height in units; set by render.js */
+  --v: 1; /* vertical stretch, >= 1 on screens taller than 2:1; set by render.js */
+  --g: calc(1 + (var(--v) - 1) * 0.25); /* a quarter of it goes to the band and the scope, all of it to the list rows */
+  --px: min(calc(100vh / 480), calc(100vw / 960));
   --bg: #0b0f14;
   --fg: #e8eef5;
   --dim: #cdd8e3;
@@ -12,50 +19,50 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--fg);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-main { display: grid; grid-template-columns: 1fr calc(352 * var(--px)); grid-template-rows: calc(88 * var(--px)) 1fr;
-  column-gap: calc(24 * var(--px)); row-gap: calc(8 * var(--px)); width: 100%; height: 100%; padding: calc(16 * var(--px)); }
+main { display: grid; grid-template-columns: minmax(0, 1fr) calc(352 * var(--g) * var(--px)); grid-template-rows: calc(88 * var(--g) * var(--px)) 1fr;
+  column-gap: calc(24 * var(--px)); row-gap: calc(8 * var(--px)); width: 100%; max-width: calc(1000 * var(--px)); margin: 0 auto; height: 100%; padding: calc(16 * var(--px)); }
 /* Top band: the featured aircraft on the left, our own clock on the right. */
 #band { grid-column: 1 / -1; display: flex; align-items: center; gap: calc(16 * var(--px));
   border-bottom: calc(1 * var(--px)) solid var(--line); padding-bottom: calc(8 * var(--px)); }
-#clock { flex: 0 0 calc(200 * var(--px)); text-align: right; }
-#time { font-size: calc(40 * var(--px)); font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums; white-space: nowrap; }
-#date { font-size: calc(20 * var(--px)); color: var(--dim); white-space: nowrap; }
+#clock { flex: 0 0 auto; min-width: calc(150 * var(--tsc) * var(--px)); text-align: right; }
+#time { font-size: calc(var(--tsc) * 40 * var(--px)); font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#date { font-size: calc(var(--tsc) * 20 * var(--px)); color: var(--dim); white-space: nowrap; }
 #left { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-#right { width: calc(352 * var(--px)); height: calc(352 * var(--px)); align-self: end; }
+#right { width: calc(352 * var(--g) * var(--px)); height: calc(352 * var(--g) * var(--px)); align-self: center; } /* centred in the space under the band: the same spot at 2:1, centred when taller */
 #scope { width: 100%; height: 100%; display: block; }
 
 #rows { position: relative; list-style: none; display: flex; flex-direction: column; gap: calc(6 * var(--px)); margin-top: auto; /* bottom-aligned */ }
-#rows li { display: grid; grid-template-columns: 1fr calc(150 * var(--px)); align-items: center;
-  column-gap: calc(6 * var(--px)); height: calc(74 * var(--px));
+#rows li { display: grid; grid-template-columns: 1fr calc(150 * var(--tsc) * var(--px)); align-items: center;
+  column-gap: calc(6 * var(--px)); height: calc(var(--rowh) * var(--px));
   padding: 0; /* flush with the band and footer: one left edge */ border-radius: calc(6 * var(--px)); }
 /* Position older than the renderer trusts (dead-reckoning cap): eased to .55 by the staledim animation. */
 @keyframes staledim { to { opacity: .55; } }
-.rt { margin-left: calc(12 * var(--px)); font-size: calc(24 * var(--px)); font-weight: 600; color: var(--dim); white-space: nowrap; }
+.rt { margin-left: calc(12 * var(--px)); font-size: calc(var(--ts) * 24 * var(--px)); font-weight: 600; color: var(--dim); white-space: nowrap; }
 .main { min-width: 0; }
-.name { font-size: calc(28 * var(--px)); font-weight: 600; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sub { font-size: calc(20 * var(--px)); color: var(--dim); height: calc(23 * var(--px)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: calc(4 * var(--px)); }
+.name { font-size: calc(var(--ts) * 28 * var(--px)); font-weight: 600; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { font-size: calc(var(--ts) * 20 * var(--px)); color: var(--dim); height: calc(23 * var(--ts) * var(--px)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: calc(4 * var(--px)); }
 .side { text-align: right; white-space: nowrap; }
-.alt { font-size: calc(28 * var(--px)); font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.arrow { display: inline-block; width: calc(28 * var(--px)); font-size: calc(24 * var(--px)); color: var(--accent); text-align: center; vertical-align: 12%; }
-.dist { font-size: calc(20 * var(--px)); color: var(--dim); height: calc(23 * var(--px)); font-variant-numeric: tabular-nums; }
+.alt { font-size: calc(var(--ts) * 28 * var(--px)); font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.arrow { display: inline-block; width: calc(28 * var(--px)); font-size: calc(var(--ts) * 24 * var(--px)); color: var(--accent); text-align: center; vertical-align: 12%; }
+.dist { font-size: calc(var(--ts) * 20 * var(--px)); color: var(--dim); height: calc(23 * var(--ts) * var(--px)); font-variant-numeric: tabular-nums; }
 
-#spot { flex: 1 1 0; min-width: 0; overflow: hidden; display: grid; grid-template-columns: 1fr;
+#spot { flex: 1 1 0; min-width: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
   align-items: center; }
 #spot .msg { grid-column: 1 / -1; }
 #spot .head { display: flex; align-items: baseline; gap: calc(12 * var(--px)); }
-.chip { padding: calc(2 * var(--px)) calc(10 * var(--px)); border-radius: calc(6 * var(--px)); font-size: calc(20 * var(--px));
+.chip { padding: calc(2 * var(--px)) calc(10 * var(--px)); border-radius: calc(6 * var(--px)); font-size: calc(var(--ts) * 20 * var(--px));
   font-weight: 700; letter-spacing: .04em; color: #0b0f14; }
-.ident { font-size: calc(30 * var(--px)); font-weight: 700; white-space: nowrap; }
-.chip.ident { font-size: calc(28 * var(--px)); padding: calc(1 * var(--px)) calc(12 * var(--px)); border-radius: calc(8 * var(--px)); letter-spacing: .02em; }
-.route { font-size: calc(26 * var(--px)); font-weight: 600; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.facts { margin-top: calc(2 * var(--px)); font-size: calc(23 * var(--px)); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.msg { font-size: calc(26 * var(--px)); color: var(--dim); padding-top: calc(10 * var(--px)); }
+.ident { font-size: calc(var(--ts) * 30 * var(--px)); font-weight: 700; white-space: nowrap; }
+.chip.ident { font-size: calc(var(--ts) * 28 * var(--px)); padding: calc(1 * var(--px)) calc(12 * var(--px)); border-radius: calc(8 * var(--px)); letter-spacing: .02em; }
+.route { font-size: calc(var(--ts) * 26 * var(--px)); font-weight: 600; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.facts { margin-top: calc(2 * var(--px)); font-size: calc(var(--ts) * 23 * var(--px)); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg { font-size: calc(var(--ts) * 26 * var(--px)); color: var(--dim); padding-top: calc(10 * var(--px)); }
 
-footer { margin-top: calc(6 * var(--px)); display: flex; justify-content: space-between; height: calc(22 * var(--px)); font-size: calc(17 * var(--px)); color: var(--dim); }
+footer { margin-top: calc(6 * var(--px)); display: flex; justify-content: space-between; height: calc(22 * var(--px)); font-size: calc(var(--ts) * 17 * var(--px)); color: var(--dim); }
 /* Stale data says so in the clock's place, large and in the warning colour: the one state the room needs to notice. */
 #note { display: none; }
 body.stale #date { display: none; }
-body.stale #note { display: block; color: var(--hot); font-size: calc(20 * var(--px)); font-weight: 700; white-space: nowrap; }
+body.stale #note { display: block; color: var(--hot); font-size: calc(var(--ts) * 20 * var(--px)); font-weight: 700; white-space: nowrap; }
 #rows, #spot { transition: opacity 3s ease; } /* the feed going stale dims the page gradually */
 body.stale #rows, body.stale #spot { opacity: .8; }
 
@@ -64,7 +71,7 @@ body.stale #rows, body.stale #spot { opacity: .8; }
    featured aircraft's, in the band) is the loudest thing. The icon is plain white. */
 .lchip { display: inline-block; padding: calc(0 * var(--px)) calc(10 * var(--px)); border-radius: calc(7 * var(--px));
   background: transparent; color: var(--fg); box-shadow: inset 0 0 0 calc(2 * var(--px)) var(--bg);
-  font-size: calc(24 * var(--px)); font-weight: 700; letter-spacing: .02em; line-height: 1.25; }
+  font-size: calc(var(--ts) * 24 * var(--px)); font-weight: 700; letter-spacing: .02em; line-height: 1.25; }
 
 /* Featured band: the type icon sits inside the callsign chip. */
 .inchip { width: calc(26 * var(--px)); height: calc(26 * var(--px)); margin-right: calc(7 * var(--px)); vertical-align: calc(-4 * var(--px)); }
@@ -84,13 +91,13 @@ body.stale #rows, body.stale #spot { opacity: .8; }
 body.solo #solo { display: flex; flex: 1 1 0; min-height: 0; align-items: center; }
 body.solo #spot { visibility: hidden; }
 .solobody { min-width: 0; }
-.solobody .chip.ident { font-size: calc(44 * var(--px)); padding: calc(2 * var(--px)) calc(16 * var(--px)); border-radius: calc(10 * var(--px)); display: inline-block; }
+.solobody .chip.ident { font-size: calc(var(--ts) * 44 * var(--px)); padding: calc(2 * var(--px)) calc(16 * var(--px)); border-radius: calc(10 * var(--px)); display: inline-block; }
 .solobody .inchip { width: calc(40 * var(--px)); height: calc(40 * var(--px)); margin-right: calc(10 * var(--px)); vertical-align: calc(-6 * var(--px)); }
-.sroute { margin-top: calc(10 * var(--px)); font-size: calc(40 * var(--px)); font-weight: 600; white-space: nowrap; }
-.salt { margin-top: calc(10 * var(--px)); font-size: calc(56 * var(--px)); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.salt .arrow { width: calc(40 * var(--px)); font-size: calc(36 * var(--px)); }
-.sdist { font-size: calc(28 * var(--px)); color: var(--dim); font-variant-numeric: tabular-nums; }
-.swho { margin-top: calc(8 * var(--px)); font-size: calc(22 * var(--px)); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sroute { margin-top: calc(10 * var(--px)); font-size: calc(var(--ts) * 40 * var(--px)); font-weight: 600; white-space: nowrap; }
+.salt { margin-top: calc(10 * var(--px)); font-size: calc(var(--ts) * 56 * var(--px)); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.salt .arrow { width: calc(40 * var(--px)); font-size: calc(var(--ts) * 36 * var(--px)); }
+.sdist { font-size: calc(var(--ts) * 28 * var(--px)); color: var(--dim); font-variant-numeric: tabular-nums; }
+.swho { margin-top: calc(8 * var(--px)); font-size: calc(var(--ts) * 22 * var(--px)); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Empty sky: a calm message on the left, a small scene drawn above it (render.js, drift). */
 #calm { display: none; }
@@ -98,8 +105,8 @@ body.empty #calm { display: flex; flex: 1 1 0; min-height: 0; flex-direction: co
 body.empty #rows { display: none; }
 .sky { width: 100%; height: calc(110 * var(--px)); margin-bottom: calc(10 * var(--px)); }
 #drift { width: 100%; height: 100%; display: block; }
-.ctitle { font-size: calc(40 * var(--px)); font-weight: 300; letter-spacing: .06em; color: var(--dim); }
-.cdetail { margin-top: calc(6 * var(--px)); font-size: calc(21 * var(--px)); font-weight: 300; color: #8393a5; }
+.ctitle { font-size: calc(var(--ts) * 40 * var(--px)); font-weight: 300; letter-spacing: .06em; color: var(--dim); }
+.cdetail { margin-top: calc(6 * var(--px)); font-size: calc(var(--ts) * 21 * var(--px)); font-weight: 300; color: #8393a5; }
 
 /* The scope recedes while the sky is quiet; it eases back when an aircraft appears. */
 #right { transition: opacity 3s ease; }
@@ -109,3 +116,29 @@ body.empty #right { opacity: .5; }
 /* No identity to show (a ~ target): the chip steps back; altitude and distance stay at full strength. */
 .chip.faint, .lchip.faint { opacity: .7; }
 .rarrow { width: 0.95em; height: 0.58em; margin: 0 0.3em; vertical-align: -0.02em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Portrait (render.js sets html.portrait when the screen is narrower than 1.2:1; html.sq as well when it
+   is squarish, 0.7 to 1.2). Tall: one column, the clock on top, then the featured aircraft, the scope
+   (--scope units, set by render.js) and the list. Squarish: the band as in landscape, then the same. */
+html.portrait main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; align-content: center; column-gap: 0; max-width: none; }
+html.portrait #band { grid-row: 1; flex-direction: column; align-items: stretch; gap: calc(10 * var(--px)); }
+/* Tall: the clock is centred on its own at the top, time over date, like a clock face. */
+html.portrait #clock { order: -1; flex: none; display: block; text-align: center; }
+html.portrait:not(.sq) #time { font-size: calc(var(--tsc) * 52 * var(--px)); }
+html.portrait #spot { flex: none; }
+html.portrait .facts { white-space: normal; }
+html.portrait:not(.sq) .facts { font-size: calc(var(--ts) * 22 * var(--px)); }
+html.portrait #spot .msg { font-size: calc(var(--ts) * 34 * var(--px)); }
+html.portrait #right { grid-row: 2; justify-self: center; align-self: center;
+  width: calc(var(--scope) * var(--px)); height: calc(var(--scope) * var(--px)); }
+html.portrait #left { grid-row: 3; }
+html.sq #band { flex-direction: row; align-items: center; gap: calc(16 * var(--px)); }
+html.sq #clock { order: 0; display: block; flex: 0 0 auto; text-align: right; }
+html.sq #spot { flex: 1 1 0; }
+/* The one-aircraft view takes over the list's place beside the scope; stacked, the band already shows it. */
+html.portrait #solo { display: none; }
+html.portrait body.solo #spot { visibility: visible; }
+html.portrait body.empty #calm { flex: none; }
+/* Fewer rows than the Rows setting: the list hugs the scope and the footer stays at the bottom. */
+html.portrait #rows { margin-top: 0; }
+html.portrait footer { margin-top: auto; }

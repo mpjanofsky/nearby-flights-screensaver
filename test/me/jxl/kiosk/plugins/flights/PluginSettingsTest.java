@@ -151,4 +151,48 @@ class PluginSettingsTest {
               .has("clock"));
     }
   }
+
+  @Test
+  void textSizeAndFeatureHoldAreClampedAndTextSizeReachesThePayload() throws Exception {
+    Map<String, Object> m = ok();
+    assertEquals(100, PluginSettings.parse(m).config.textPercent);
+    assertEquals(90, PluginSettings.parse(m).config.featureHoldSec);
+    m.put("textSize", 500);
+    m.put("featureHoldSec", 1);
+    Config c = PluginSettings.parse(m).config;
+    assertEquals(125, c.textPercent);
+    assertEquals(10, c.featureHoldSec);
+    m.put("textSize", 115);
+    Config w = PluginSettings.parse(m).config.withRadius(60 * 1852.0);
+    assertEquals(115, w.textPercent);
+    String json =
+        PayloadEncoder.encode(
+            java.util.Collections.emptyList(),
+            w,
+            new PayloadEncoder.Health(0, false, "local"),
+            1,
+            1);
+    assertEquals(115, new org.json.JSONObject(json).getInt("ts"));
+    m.put("maxRows", 2);
+    assertEquals(
+        2,
+        new org.json.JSONObject(
+                PayloadEncoder.encode(
+                    java.util.Collections.emptyList(),
+                    PluginSettings.parse(m).config,
+                    new PayloadEncoder.Health(0, false, "local"),
+                    1,
+                    1))
+            .getInt("mr"));
+    m.put("textSize", 100);
+    assertFalse(
+        new org.json.JSONObject(
+                PayloadEncoder.encode(
+                    java.util.Collections.emptyList(),
+                    PluginSettings.parse(m).config,
+                    new PayloadEncoder.Health(0, false, "local"),
+                    1,
+                    1))
+            .has("ts"));
+  }
 }

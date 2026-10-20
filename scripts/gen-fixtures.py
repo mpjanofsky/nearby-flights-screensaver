@@ -96,10 +96,12 @@ fx = {
     "normal-4": base(normal, ft="a4d5e6"),  # featured need not be first
     "rows-1": base(normal[:1]),
     "rows-2": base(normal[:2]),
+    "max-rows-2": base(normal[:3], ft="a4d5e6", mr=2),  # Rows setting 2: 1 featured + 2 listed
     "rows-3": base(normal[:3]),
     "empty": base([]),
     "clock-12": base([], clock="12"),
     "clock-24": base([], clock="24"),
+    "text-125": base(normal, ft="a4d5e6", ts=125),
     "stale": base(normal, st=True, fa=150.0),
     "idle": base([], fa=None, idle=True),  # fetching paused while the screensaver is hidden
     "settings-error": base([], ap=[], msg="Set your home latitude and longitude"),

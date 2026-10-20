@@ -7,7 +7,7 @@
   body { font: 14px system-ui, sans-serif; background: #222; color: #ddd; margin: 12px; }
   #bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 10px; }
   #stage { width: 960px; height: 480px; background: #000; }
-  iframe { width: 960px; height: 480px; border: 0; display: block; }
+  iframe { width: 100%; height: 100%; border: 0; display: block; }
   button, select, input { font: inherit; }
 </style>
 </head>
@@ -16,6 +16,8 @@
   <label>Fixture <select id="fx"></select></label>
   <button id="pub">Simulate publish</button>
   <label>Auto-publish <select id="auto"><option value="0">off</option><option value="3">3 s</option><option value="10" selected>10 s</option></select></label>
+  <label>Screen <select id="size"><option>960x480</option><option>800x480</option><option>1280x800</option><option>1024x768</option><option>1280x720</option><option>1920x1080</option></select></label>
+  <label>Text size % <input id="ts" type="number" value="100" min="80" max="125" step="5" style="width:4em"></label>
   <label>Payload age (s) <input id="age" type="number" value="0" min="0" style="width:5em"></label>
   <label><input type="checkbox" id="ksfoot"> KS widget footprint</label>
   <label><input type="checkbox" id="outl"> Outlined list chips</label>
@@ -45,6 +47,7 @@ async function load() {
 }
 function publish() {
   const p = { ...payload, gen: Date.now() - Number($('age').value) * 1000 };
+  if (Number($('ts').value) !== 100) p.ts = Number($('ts').value);
   const json = JSON.stringify(p).replace(/</g, '\\u003c');
   const html = page.replace('<head>', '<head><base href="' + new URL(BASE, location.href).href + '">')
     .replace('/*PAYLOAD*/', () => json);
@@ -54,6 +57,17 @@ function publish() {
 }
 $('fx').onchange = load;
 $('pub').onclick = publish;
+$('ts').onchange = publish;
+// The stage is the real screen size (the page inside sees that viewport); the view is scaled down to fit the window.
+const fit = () => {
+  const [w, h] = $('size').value.split('x').map(Number), st = $('stage');
+  st.style.width = w + 'px'; st.style.height = h + 'px';
+  const k = Math.min(1, (innerWidth - 24) / w, (innerHeight - $('bar').offsetHeight - 36) / h);
+  st.style.transformOrigin = '0 0'; st.style.transform = 'scale(' + k + ')';
+  st.style.marginBottom = (h * (k - 1)) + 'px';
+};
+$('size').onchange = fit;
+addEventListener('resize', fit);
 $('age').onchange = publish;
 $('auto').onchange = () => {
   clearInterval(timer);
@@ -64,6 +78,7 @@ $('ksfoot').onchange = () => { $('ksw').style.display = $('ksfoot').checked ? 'b
 const applyChips = () => { try { $('frame').contentDocument.getElementById('rows').classList.toggle('outline', $('outl').checked); } catch (e) { /* frame not ready */ } };
 $('frame').addEventListener('load', applyChips);
 $('outl').onchange = applyChips;
+fit();
 boot().then(() => $('auto').onchange());
 </script>
 </body>

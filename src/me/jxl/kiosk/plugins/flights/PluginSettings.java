@@ -72,7 +72,9 @@ public final class PluginSettings {
             widen,
             maxRadiusNm * 1852.0,
             Boolean.TRUE.equals(m.get("demoQuiet")),
-            clockCode(str(m.get("clockFormat"), "Device default")));
+            clockCode(str(m.get("clockFormat"), "Device default")),
+            (int) num(m.get("textSize"), 100, 80, 125),
+            (int) num(m.get("featureHoldSec"), 90, 10, 300));
     return new PluginSettings(
         c, primary, fallback, url, (long) num(m.get("refreshSec"), 10, 5, 60) * 1000L, err);
   }

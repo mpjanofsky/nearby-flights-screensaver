@@ -123,4 +123,19 @@ class FeaturingTest {
     assertEquals(
         "b", h.apply(l, Featuring.MIN_HOLD_MS, t -> t.aircraft.hex.equals("b")).featuredId);
   }
+
+  @Test
+  void aShorterHoldRotatesTheBandSooner() {
+    Featuring f = new Featuring(30_000);
+    f.apply(byDistance(at("a", 1000), at("b", 2000)), 0);
+    assertEquals("a", f.apply(byDistance(at("a", 1000), at("b", 2000)), 29_999).featuredId);
+    assertEquals("b", f.apply(byDistance(at("a", 1000), at("b", 2000)), 30_000).featuredId);
+  }
+
+  @Test
+  void aHoldBelowTheMinimumStillRotates() {
+    Featuring f = new Featuring(10_000);
+    f.apply(byDistance(at("a", 1000), at("b", 2000)), 0);
+    assertEquals("b", f.apply(byDistance(at("a", 1000), at("b", 2000)), 10_000).featuredId);
+  }
 }

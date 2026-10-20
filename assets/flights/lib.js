@@ -34,6 +34,8 @@
     if (!(isNum(p.r) && p.r > 0)) e.push('r must be > 0');
     if (!UNITS[p.u]) e.push('u must be av|met|imp');
     if (!(p.clock === undefined || p.clock === '12' || p.clock === '24')) e.push('clock must be 12|24');
+    if (!(p.ts === undefined || (isNum(p.ts) && p.ts >= 50 && p.ts <= 200))) e.push('ts must be 50..200');
+    if (!(p.mr === undefined || (Number.isInteger(p.mr) && p.mr >= 1 && p.mr <= 4))) e.push('mr must be 1..4');
     if (!optStr(p.ft)) e.push('ft must be a string');
     if (!optStr(p.msg)) e.push('msg must be a string');
     if (!(p.idle === undefined || typeof p.idle === 'boolean')) e.push('idle must be boolean');
@@ -342,8 +344,11 @@
     const rest = [ac.rg, row.distText, row.alt].filter(Boolean); // distance and bearing, as in the list
     // Full type name where the line has room (about 68 characters), else the ICAO code.
     const room = 68 - [ac.an, ...rest].filter(Boolean).join(' · ').length - 3 - (row.trend === 'level' ? 0 : 2); // the arrow follows the altitude
-    const facts = [ac.an || (isUnidentified(ac) ? 'Position only' : null), typeLabel(ac.ty, room), ...rest].filter(Boolean).join(' · ');
-    return { n: row.n, name: row.name, route, unconfirmed: !!route && !ac.d, facts, trend: row.trend, chip: null, hue: chipHue(ac.al) };
+    const who = [ac.an || (isUnidentified(ac) ? 'Position only' : null), typeLabel(ac.ty, room)].filter(Boolean);
+    const facts = [...who, ...rest].join(' · ');
+    // The same facts as two lines (who and what, then registration, distance and altitude) for narrow screens.
+    const lines = [who.join(' · '), rest.join(' · ')].filter(Boolean);
+    return { n: row.n, name: row.name, route, unconfirmed: !!route && !ac.d, facts, lines, trend: row.trend, chip: null, hue: chipHue(ac.al) };
   }
 
   // Rough brand hues for the common carriers; anything else gets a stable hash hue.

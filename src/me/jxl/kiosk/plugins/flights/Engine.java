@@ -32,7 +32,7 @@ public final class Engine {
   private final Enricher enricher; // may be null (tests, enrichment off)
   private final Selector selector = new Selector();
   private final PublishGate gate = new PublishGate();
-  private final Featuring featuring = new Featuring();
+  private final Featuring featuring;
 
   /** Per shown aircraft: {first shown ms, route-known ms or -1, callsign-known 0/1}. */
   private final java.util.Map<String, long[]> shown = new java.util.HashMap<>();
@@ -81,6 +81,7 @@ public final class Engine {
       long refreshMs,
       Enricher enricher) {
     this.enricher = enricher;
+    this.featuring = new Featuring(config.featureHoldSec * 1000L);
     if (enricher != null) selector.setNotReady(enricher::notReady);
     this.config = config;
     this.primary = primary;

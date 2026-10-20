@@ -47,6 +47,9 @@ public final class FlightsPlugin implements KioskPlugin {
   /** True when the tick loop ended because of {@link #paused} and must be restarted on resume. */
   private boolean loopParked;
 
+  /** Why the host refused the last publish, or null. Shown on the status line (issue #10). */
+  private volatile String publishProblem;
+
   private ScheduledFuture<?> next; // the waiting tick, cancelled on pause
   private boolean ticking; // a tick is running now, and will schedule the next itself
 
@@ -181,7 +184,8 @@ public final class FlightsPlugin implements KioskPlugin {
     long delay;
     try {
       delay = e.tick(System.currentTimeMillis());
-      if (!paused) host.status(e.statusText(), e.isStale()); // keep "Paused" showing
+      if (!paused)
+        host.status(withPublishProblem(e.statusText()), e.isStale()); // keep "Paused" showing
       for (String line : e.drainEnrichEvents()) host.log(line);
       long nowMs = System.currentTimeMillis();
       if (nowMs - lastSummaryMs >= SUMMARY_EVERY_MS) {
@@ -211,11 +215,27 @@ public final class FlightsPlugin implements KioskPlugin {
       String html =
           FlightsHtml.html().replaceFirst("/\\*PAYLOAD\\*/", Matcher.quoteReplacement(payloadJson));
       host.publishScreensaver(KEY, TITLE, html);
+      publishProblem = null;
     } catch (RuntimeException e) {
-      host.log(
-          "publish skipped: "
-              + e.getClass().getSimpleName()); // host revoked after stop(): safe to drop
+      // The host refuses when the screensaver capability is not granted or screensavers are
+      // unavailable; the plugin then never appears in Kiosk Satellite's screensaver list while the
+      // data side looks healthy (issue #10). Say so on the status line. The host's message is
+      // about the host, never about our data, so it is safe to show, shortened.
+      String msg = e.getMessage() == null ? "" : ": " + e.getMessage();
+      publishProblem =
+          e.getClass().getSimpleName() + (msg.length() > 80 ? msg.substring(0, 80) : msg);
+      host.log("publish refused: " + publishProblem);
+      host.status("Screensaver not registered (" + publishProblem + ")", true);
     }
+  }
+
+  /**
+   * The status line, with the host's refusal to register the screensaver appended when there is
+   * one.
+   */
+  private String withPublishProblem(String text) {
+    String p = publishProblem;
+    return p == null ? text : text + " | Screensaver not registered (" + p + ")";
   }
 
   private void stopEnricher() {

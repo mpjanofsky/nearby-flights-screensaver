@@ -26,7 +26,7 @@ import java.util.function.Predicate;
  */
 final class Featuring {
   static final long MIN_HOLD_MS = 20_000;
-  static final long MAX_HOLD_MS = 90_000;
+  static final long MAX_HOLD_MS = 90_000; // the default; a setting can change it
   static final long RESORT_MS = 30_000;
   static final double SWITCH_RATIO = 0.7;
 
@@ -39,6 +39,17 @@ final class Featuring {
       this.rows = rows;
       this.featuredId = featuredId;
     }
+  }
+
+  private final long maxHoldMs;
+
+  Featuring() {
+    this(MAX_HOLD_MS);
+  }
+
+  /** `maxHoldMs` is the longest one aircraft keeps the band while another is available. */
+  Featuring(long maxHoldMs) {
+    this.maxHoldMs = maxHoldMs;
   }
 
   private List<String> order = new ArrayList<>();
@@ -66,9 +77,9 @@ final class Featuring {
       choose(closest, nowMs);
     } else {
       long held = nowMs - featuredSinceMs;
-      if (held >= MAX_HOLD_MS && byDistance.size() > 1) {
+      if (held >= maxHoldMs && byDistance.size() > 1) {
         choose(best(byDistance, complete, cur), nowMs);
-      } else if (held >= MIN_HOLD_MS
+      } else if (held >= Math.min(MIN_HOLD_MS, maxHoldMs)
           && closest != cur
           && (closest.distM < cur.distM * SWITCH_RATIO
               || (!complete.test(cur) && complete.test(closest)))) {

@@ -15,6 +15,12 @@ public final class Config {
   /** Demo switch: publish an empty sky whatever is overhead, to show the quiet-sky screen. */
   public final boolean demoQuiet;
 
+  /** Text size in percent (80..125); the renderer scales its type by it. 100 is the design size. */
+  public final int textPercent;
+
+  /** Longest the top band keeps one aircraft while others are available, in seconds (10..300). */
+  public final int featureHoldSec;
+
   /** Hard or soft radius; see {@link Widen}. */
   public final Widen widen;
 
@@ -75,6 +81,36 @@ public final class Config {
       double maxRadiusM,
       boolean demoQuiet,
       String clockFormat) {
+    this(
+        homeLat,
+        homeLon,
+        radiusM,
+        units,
+        maxRows,
+        excludeGa,
+        widen,
+        maxRadiusM,
+        demoQuiet,
+        clockFormat,
+        100,
+        90);
+  }
+
+  public Config(
+      double homeLat,
+      double homeLon,
+      double radiusM,
+      String units,
+      int maxRows,
+      boolean excludeGa,
+      Widen widen,
+      double maxRadiusM,
+      boolean demoQuiet,
+      String clockFormat,
+      int textPercent,
+      int featureHoldSec) {
+    this.textPercent = Math.max(80, Math.min(125, textPercent));
+    this.featureHoldSec = Math.max(10, Math.min(300, featureHoldSec));
     this.clockFormat = clockFormat;
     this.demoQuiet = demoQuiet;
     this.homeLat = homeLat;
@@ -99,7 +135,9 @@ public final class Config {
         widen,
         maxRadiusM,
         demoQuiet,
-        clockFormat);
+        clockFormat,
+        textPercent,
+        featureHoldSec);
   }
 
   /** Aircraft to publish: the featured one (shown in the top band) plus the list rows. */

@@ -45,8 +45,51 @@
 
   const { p: P, err: ERR } = readPayload();
   const $ = (id) => document.getElementById(id);
+  // Layout maths (style.css has the matching rules). --px is one layout unit in screen pixels.
+  // Three shapes, chosen by aspect ratio (width / height):
+  //   landscape (>= 1.2): 960x480 units; spare height stretches the band, the scope and the rows.
+  //   squarish portrait (0.7 to 1.2): 600 units wide, band across the top, scope, then the list.
+  //   tall portrait (< 0.7): 540 wide, clock, featured aircraft, scope, list stacked.
+  // The squarish and tall shapes give the scope the height left after the rows the "Rows" setting
+  // allows (`mr`, not the number showing, so it never resizes while the screen is up).
+  // The text setting grows the fixed parts too, so a bigger size shrinks the scope, not the rows.
+  let ROW_H = 74; // list row height in units
+  function layout() {
+    const w = innerWidth, h = innerHeight, a = w / h, root = document.documentElement;
+    const ts = ((P && P.ts) || 100) / 100, mr = Math.max(1, Math.min(4, (P && P.mr) || 4));
+    const shape = a >= 1.2 ? 'land' : a >= 0.7 && ts <= 1.1 ? 'sq' : 'tall'; // big text has no room for the clock beside the band
+    let px, scope = 0, v = 1, bonus = 0;
+    if (shape === 'land') {
+      px = Math.min(h / 480, w / 960);
+      const hu = h / px;
+      v = Math.max(1, Math.min(1.8, hu / 480));
+      bonus = (v - 1) * 0.15;
+      if (v > 1.001) { // rows take the height the band and scope leave, so nothing floats
+        const avail = hu - 32 - 88 * (1 + (v - 1) * 0.25) - 8 - 34;
+        ROW_H = Math.max(74, Math.min(74 * 1.5, (avail - (mr - 1) * 6) / mr));
+      } else ROW_H = 74;
+    } else {
+      const DW = (shape === 'sq' ? 600 : 540) * (1 + (ts - 1) * 0.4), SCOPE_MIN = 260; // wider text needs more width
+      const rows = mr * 80 - 6, fixed = (shape === 'sq' ? 190 : 255) * (1 + (ts - 1) * 0.6) + rows;
+      px = Math.min(w / DW, h / (fixed + SCOPE_MIN));
+      const spare = h / px - fixed;
+      scope = Math.max(SCOPE_MIN, Math.min(spare, w / px - 32, 520));
+      ROW_H = 74 * (1 + Math.min(0.25, Math.max(0, spare - scope) / (mr * 74))); // what the scope cannot use
+    }
+    root.classList.toggle('portrait', shape !== 'land');
+    root.classList.toggle('sq', shape === 'sq');
+    const st = root.style;
+    st.setProperty('--px', px + 'px');
+    st.setProperty('--v', String(v));
+    st.setProperty('--rowh', String(ROW_H));
+    st.setProperty('--scope', String(scope));
+    const eff = Math.max(ts, Math.min(ts * (1 + bonus), 1.3)); // setting x aspect bonus, never past 1.3
+    st.setProperty('--ts', String(eff));
+    st.setProperty('--tsc', String(1 + (eff - 1) * 0.5));
+  }
+  layout();
 
-  const ROW_PITCH = 80; // list row height plus gap, in --px units (style.css)
+  const rowPitch = () => ROW_H + 6; // list row height plus gap, in --px units (style.css)
   const GLIDE_MS = 1000; // a blip slides from where the last page drew it to its fresh fix
   const FADE_MS = 1000; // a change of content fades in over the old one instead of switching
   const STALE_MS = 3000; // an old position eases to its dim look instead of switching to it
@@ -100,13 +143,21 @@
     chip.appendChild(document.createTextNode(s.name));
     head.appendChild(chip);
     if (s.route) head.appendChild(routeEl('div', s.unconfirmed ? 'route unc' : 'route', s.route));
-    const facts = el('div', 'facts');
     const LEAD = 'Position only';
-    if (s.facts.startsWith(LEAD)) { facts.appendChild(el('span', 'unc', LEAD)); facts.appendChild(document.createTextNode(s.facts.slice(LEAD.length))); }
-    else facts.textContent = s.facts;
-    if (ARROW[s.trend]) facts.appendChild(el('span', 'arrow', ARROW[s.trend])); // altitude is the last fact: same climb/descent arrow as the list
+    const factsEl = (text, trend) => {
+      const f = el('div', 'facts');
+      if (text.startsWith(LEAD)) { f.appendChild(el('span', 'unc', LEAD)); f.appendChild(document.createTextNode(text.slice(LEAD.length))); }
+      else f.textContent = text;
+      if (ARROW[trend]) f.appendChild(el('span', 'arrow', ARROW[trend])); // altitude is the last fact: same climb/descent arrow as the list
+      return f;
+    };
+    // Tall portrait has room for two short lines but not one long one, so it breaks them where the meaning does.
+    const tall = document.documentElement.classList.contains('portrait') && !document.documentElement.classList.contains('sq');
+    const facts = tall && s.lines.length > 1
+      ? [factsEl(s.lines[0], null), factsEl(s.lines[1], s.trend)]
+      : [factsEl(s.facts, s.trend)];
     const body = el('div', 'spotbody');
-    body.append(head, facts);
+    body.append(head, ...facts);
     return body;
   }
 
@@ -163,7 +214,7 @@
       tr.ghosts.forEach((g) => { // what was in a place before fades out over what is there now
         const li = rowEl(FL.makeRow(g.ac, 0, P, now));
         li.classList.add('ghost');
-        li.style.bottom = 'calc(' + g.k * ROW_PITCH + ' * var(--px))';
+        li.style.bottom = 'calc(' + g.k * rowPitch() + ' * var(--px))';
         fade(li, 'fadeout', 'both');
         rows.appendChild(li);
       });
@@ -520,7 +571,7 @@
     if (document.body.classList.contains('empty')) drift(now);
     drawScope(now);
   }
-  window.addEventListener('resize', fit);
+  window.addEventListener('resize', () => { layout(); fit(); });
   fit();
   requestAnimationFrame(frame);
 })();

@@ -39,10 +39,22 @@ or both. No account or key needed.
 |---|---|
 | **Needs** | Kiosk Satellite with plugin support (plugin API version 1) on Android 7.0 or newer |
 | **Tested on** | Echo Show 5 (960 × 480) |
-| **Should work on** | Landscape screens from about 5:3 to 16:9, like 800 × 480, 1280 × 720 and 1920 × 1080. I checked those in a desktop browser, not on real hardware. |
-| **Not yet** | 4:3 tablets and portrait screens. The layout was built for wide screens, so on those the list and the clock get clipped. |
+| **Should work on** | Landscape and portrait screens of any shape: the layout rescales (wide, 16:10, 4:3, square) and stacks when the screen is taller than wide. I checked sizes from 800 × 480 to 2560 × 1600, such as 1280 × 800 (Echo Show 8, Meta Portal) and 1920 × 1200 tablets, in a desktop browser, not on real hardware. |
 
 Tried it on something else? Please report how it looks.
+
+<table>
+<tr>
+<td><img src="docs/images/screen-1280x800.png" alt="1280 by 800 landscape: the list rows fill the height under the top band" width="360"></td>
+<td><img src="docs/images/screen-portrait-4x3.png" alt="768 by 1024 portrait: the top band, a larger scope, then the list" width="200"></td>
+<td><img src="docs/images/screen-portrait-tall.png" alt="800 by 1280 portrait: centred clock, the featured aircraft on three lines, the scope, then the list" width="200"></td>
+</tr>
+<tr>
+<td align="center">1280 × 800 landscape</td>
+<td align="center">768 × 1024 portrait</td>
+<td align="center">800 × 1280 portrait</td>
+</tr>
+</table>
 
 ## 🚀 Install
 
@@ -79,7 +91,8 @@ settings.
 ![Open-arrow route in the top band, and a position-only target at the bottom of the list](docs/images/screen-route-tiers.png)
 
 - **Top band:** the featured aircraft, usually the closest one. It stays for at least 20 seconds,
-  and changes after that only if something else is clearly closer.
+  and changes after that only if something else is clearly closer, or when the **Featured aircraft hold**
+  runs out (90 seconds by default).
 - **List:** up to four more aircraft, closest first.
 - **Scope:** a radar-style view centered on the location you entered, with nearby airports marked.
   The closest aircraft gets a yellow circle.
@@ -123,6 +136,8 @@ Open the plugin's row in Plugin Manager. Changes apply straight away.
 |---|---|---|
 | Units | Aviation | **Aviation** (nautical miles, feet), **Metric** (km, m) or **Imperial** (miles, feet). |
 | Clock format | Device default | Follow the device locale, or choose **12 hour** or **24 hour**. Uses the device time zone. |
+| Text size (%) | 100 | Scales the type, 80 to 125. Larger text elides long lines sooner, and four rows may not fit on a short screen. |
+| Featured aircraft hold (s) | 90 | Longest the top band keeps one aircraft while others are in range, 10 to 300. A clearly closer aircraft can still take it sooner. |
 | Rows | 4 | List rows under the top band, 1 to 4. |
 | Hide general aviation | off | Hides light aircraft, helicopters and bare-registration callsigns. |
 | Demo: quiet sky | off | Always shows the empty-sky screen. |
@@ -185,6 +200,7 @@ those in from lookups a few seconds later. A new row can change as details arriv
 | What you see | What to check |
 |---|---|
 | The screensaver doesn't appear | Plugin switched on? Screensaver mode set to Nearby Flights? A Kiosk Satellite schedule can override it. |
+| "Nearby Flights" is missing from Screensaver mode, but the status line shows aircraft | Restart Kiosk Satellite: on one device the entry only appeared after a restart. If it is still missing, look for "Screensaver not registered (...)" on the status line (Kiosk Satellite refused the registration) and open an issue with that text and your Kiosk Satellite version. |
 | A message about settings | Latitude and longitude must be decimal numbers. The status line says what's wrong. |
 | "Quiet sky" all the time | Radius too small, or Hide general aviation is on. Try a bigger radius or Soft. Check Demo: quiet sky is off. |
 | "No new data" | The source isn't answering. Check the local feed URL in a browser. With the fallback on, it recovers by itself. |

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flights: screen sizes</title>
+<style>
+  body { margin: 8px; background: #222; color: #ddd; font: 12px system-ui, sans-serif; }
+  #grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+  figure { margin: 0; }
+  figcaption { margin-bottom: 3px; }
+  .cell { overflow: hidden; background: #000; outline: 1px solid #555; }
+  iframe { border: 0; display: block; transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<!-- Every screen size at once, each in an iframe of the real size scaled to fit a thumbnail.
+     ?fx=normal-5 picks the fixture; ?w=300 sets the thumbnail's longest side (default 300). -->
+<div id="grid"></div>
+<script>
+const SIZES = [
+  ['Echo Show 5 / Gen 2', 960, 480], ['800x480', 800, 480], ['Fire 7 / 5:3', 1024, 600], ['16:9', 1280, 720],
+  ['Echo Show 8, Portal, Fire HD 8', 1280, 800], ['Lenovo Tab One', 1340, 800], ['Tab A, Fire HD 10', 1920, 1200],
+  ['Portal+, Show 15, 1080p', 1920, 1080], ['4:3 tablet', 1024, 768], ['4:3 large', 2048, 1536], ['Pixel Tablet', 2560, 1600],
+  ['Phone landscape', 1560, 720], ['Square', 900, 900],
+  ['Portrait 16:10', 800, 1280], ['Portrait 5:3', 600, 1024], ['Portrait 4:3', 768, 1024], ['Portrait 16:9', 1080, 1920],
+  ['Portrait tablet', 1200, 1920], ['Portrait phone', 720, 1560], ['Portrait 3:4 large', 1536, 2048], ['Portrait Echo 5', 480, 960],
+];
+const q = new URLSearchParams(location.search), fx = q.get('fx') || 'normal-5', big = Number(q.get('w') || 300);
+(async () => {
+  const page = await (await fetch('../assets/flights/index.html')).text();
+  const payload = await (await fetch('../fixtures/payload/' + fx + '.json')).json();
+  const base = new URL('../assets/flights/', location.href).href;
+  for (const [name, w, h] of SIZES) {
+    const k = big / Math.max(w, h), fig = document.createElement('figure');
+    fig.innerHTML = '<figcaption>' + name + ' ' + w + 'x' + h + '</figcaption>';
+    const cell = document.createElement('div'); cell.className = 'cell';
+    cell.style.width = Math.round(w * k) + 'px'; cell.style.height = Math.round(h * k) + 'px';
+    const f = document.createElement('iframe'); f.width = w; f.height = h; f.style.transform = 'scale(' + k + ')';
+    const json = JSON.stringify({ ...payload, gen: Date.now() }).replace(/</g, '\\u003c');
+    f.srcdoc = page.replace('<head>', '<head><base href="' + base + '">').replace('/*PAYLOAD*/', () => json);
+    cell.appendChild(f); fig.appendChild(cell); $grid.appendChild(fig);
+  }
+})();
+const $grid = document.getElementById('grid');
+</script>
+</body>
+</html>
