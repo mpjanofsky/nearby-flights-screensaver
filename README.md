@@ -150,6 +150,7 @@ Open the plugin's row in Plugin Manager. Changes apply straight away.
 | Text size (%) | 100 | Scales the type, 80 to 125. Larger text elides long lines sooner, and four rows may not fit on a short screen. |
 | Featured aircraft hold (s) | 90 | Longest the top band keeps one aircraft while others are in range, 10 to 300. A clearly closer aircraft can still take it sooner. |
 | Rows | 4 | List rows under the top band, 1 to 4. |
+| Radar position (portrait only) | Top | **Top**: under the featured aircraft. **Bottom**: below the list. Landscape ignores it. |
 | Hide general aviation | off | Hides light aircraft, helicopters and bare-registration callsigns. |
 | Demo: quiet sky | off | Always shows the empty-sky screen. |
 

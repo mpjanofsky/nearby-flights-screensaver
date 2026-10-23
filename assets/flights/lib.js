@@ -35,6 +35,7 @@
     if (!UNITS[p.u]) e.push('u must be av|met|imp');
     if (!(p.clock === undefined || p.clock === '12' || p.clock === '24')) e.push('clock must be 12|24');
     if (!(p.ts === undefined || (isNum(p.ts) && p.ts >= 50 && p.ts <= 200))) e.push('ts must be 50..200');
+    if (!(p.rp === undefined || p.rp === 'b')) e.push('rp must be "b" or omitted');
     if (!(p.mr === undefined || (Number.isInteger(p.mr) && p.mr >= 1 && p.mr <= 4))) e.push('mr must be 1..4');
     if (!optStr(p.ft)) e.push('ft must be a string');
     if (!optStr(p.msg)) e.push('msg must be a string');

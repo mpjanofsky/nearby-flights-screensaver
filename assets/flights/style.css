@@ -120,8 +120,12 @@ body.empty #right { opacity: .5; }
 /* Portrait (render.js sets html.portrait when the screen is narrower than 1.2:1; html.sq as well when it
    is squarish, 0.7 to 1.2). Tall: one column, the clock on top, then the featured aircraft, the scope
    (--scope units, set by render.js) and the list. Squarish: the band as in landscape, then the same. */
-html.portrait main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; align-content: center; column-gap: 0; max-width: none; }
-html.portrait #band { grid-row: 1; flex-direction: column; align-items: stretch; gap: calc(10 * var(--px)); }
+/* Rows: band, scope, list, footer (html.rb, the Radar position setting "Bottom": band, list, scope, footer). The list
+   and the scope are direct grid items (#left is display: contents), so the scope never moves with the
+   number of aircraft: only the empty space after the list changes. */
+html.portrait main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; column-gap: 0; max-width: none; }
+html.portrait.rb main { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+html.portrait #band { min-height: calc(var(--bandmin, 0) * var(--px)); grid-row: 1; flex-direction: column; align-items: stretch; gap: calc(10 * var(--px)); }
 /* Tall: the clock is centred on its own at the top, time over date, like a clock face. */
 html.portrait #clock { order: -1; flex: none; display: block; text-align: center; }
 html.portrait:not(.sq) #time { font-size: calc(var(--tsc) * 52 * var(--px)); }
@@ -129,9 +133,12 @@ html.portrait #spot { flex: none; }
 html.portrait .facts { white-space: normal; }
 html.portrait:not(.sq) .facts { font-size: calc(var(--ts) * 22 * var(--px)); }
 html.portrait #spot .msg { font-size: calc(var(--ts) * 34 * var(--px)); }
-html.portrait #right { grid-row: 2; justify-self: center; align-self: center;
+html.portrait #right { grid-row: 2; justify-self: center; align-self: start;
   width: calc(var(--scope) * var(--px)); height: calc(var(--scope) * var(--px)); }
-html.portrait #left { grid-row: 3; }
+html.portrait #left { display: contents; }
+html.portrait #rows, html.portrait #calm { grid-row: 3; align-self: start; }
+html.portrait.rb #right { grid-row: 3; align-self: end; }
+html.portrait.rb #rows, html.portrait.rb #calm { grid-row: 2; }
 html.sq #band { flex-direction: row; align-items: center; gap: calc(16 * var(--px)); }
 html.sq #clock { order: 0; display: block; flex: 0 0 auto; text-align: right; }
 html.sq #spot { flex: 1 1 0; }
@@ -139,6 +146,6 @@ html.sq #spot { flex: 1 1 0; }
 html.portrait #solo { display: none; }
 html.portrait body.solo #spot { visibility: visible; }
 html.portrait body.empty #calm { flex: none; }
-/* Fewer rows than the Rows setting: the list hugs the scope and the footer stays at the bottom. */
+/* Fewer rows than the Rows setting: the list hugs the scope (or the band) and the footer stays at the bottom. */
 html.portrait #rows { margin-top: 0; }
-html.portrait footer { margin-top: auto; }
+html.portrait footer { grid-row: 4; margin-top: 0; }

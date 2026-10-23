@@ -98,6 +98,7 @@ public final class PayloadEncoder {
     if (c.clockFormat != null) s.append(",\"clock\":").append(str(c.clockFormat));
     if (c.maxRows != 4) s.append(",\"mr\":").append(c.maxRows);
     if (c.textPercent != 100) s.append(",\"ts\":").append(c.textPercent);
+    if (c.radarBottom) s.append(",\"rp\":\"b\"");
     if (featuredId != null) s.append(",\"ft\":").append(str(featuredId));
     if (change != null) s.append(",\"pn\":").append(change.previousListRows);
     s.append(",\"ac\":[");

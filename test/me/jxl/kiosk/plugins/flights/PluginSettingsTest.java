@@ -195,4 +195,27 @@ class PluginSettingsTest {
                     1))
             .has("ts"));
   }
+
+  @Test
+  void radarPositionDefaultsToUnderTheBandAndOnlyBottomReachesThePayload() throws Exception {
+    Map<String, Object> m = ok();
+    assertFalse(PluginSettings.parse(m).config.radarBottom);
+    assertFalse(encode(PluginSettings.parse(m).config).has("rp"));
+    m.put("radarPosition", "Bottom");
+    Config c = PluginSettings.parse(m).config.withRadius(60 * 1852.0);
+    assertTrue(c.radarBottom);
+    assertEquals("b", encode(c).getString("rp"));
+    m.put("radarPosition", "nonsense");
+    assertFalse(PluginSettings.parse(m).config.radarBottom);
+  }
+
+  private static org.json.JSONObject encode(Config c) {
+    return new org.json.JSONObject(
+        PayloadEncoder.encode(
+            java.util.Collections.emptyList(),
+            c,
+            new PayloadEncoder.Health(0, false, "local"),
+            1,
+            1));
+  }
 }

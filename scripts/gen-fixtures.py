@@ -101,6 +101,7 @@ fx = {
     "empty": base([]),
     "clock-12": base([], clock="12"),
     "clock-24": base([], clock="24"),
+    "radar-bottom": base(normal[:3], ft="a4d5e6", rp="b"),  # Radar position Bottom: list first, scope below it
     "text-125": base(normal, ft="a4d5e6", ts=125),
     "stale": base(normal, st=True, fa=150.0),
     "idle": base([], fa=None, idle=True),  # fetching paused while the screensaver is hidden

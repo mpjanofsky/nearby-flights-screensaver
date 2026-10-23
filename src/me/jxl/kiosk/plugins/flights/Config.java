@@ -18,6 +18,12 @@ public final class Config {
   /** Text size in percent (80..125); the renderer scales its type by it. 100 is the design size. */
   public final int textPercent;
 
+  /**
+   * Portrait only: the radar sits below the list, above the footer, instead of right under the
+   * band.
+   */
+  public final boolean radarBottom;
+
   /** Longest the top band keeps one aircraft while others are available, in seconds (10..300). */
   public final int featureHoldSec;
 
@@ -109,6 +115,37 @@ public final class Config {
       String clockFormat,
       int textPercent,
       int featureHoldSec) {
+    this(
+        homeLat,
+        homeLon,
+        radiusM,
+        units,
+        maxRows,
+        excludeGa,
+        widen,
+        maxRadiusM,
+        demoQuiet,
+        clockFormat,
+        textPercent,
+        featureHoldSec,
+        false);
+  }
+
+  public Config(
+      double homeLat,
+      double homeLon,
+      double radiusM,
+      String units,
+      int maxRows,
+      boolean excludeGa,
+      Widen widen,
+      double maxRadiusM,
+      boolean demoQuiet,
+      String clockFormat,
+      int textPercent,
+      int featureHoldSec,
+      boolean radarBottom) {
+    this.radarBottom = radarBottom;
     this.textPercent = Math.max(80, Math.min(125, textPercent));
     this.featureHoldSec = Math.max(10, Math.min(300, featureHoldSec));
     this.clockFormat = clockFormat;
@@ -137,7 +174,8 @@ public final class Config {
         demoQuiet,
         clockFormat,
         textPercent,
-        featureHoldSec);
+        featureHoldSec,
+        radarBottom);
   }
 
   /** Aircraft to publish: the featured one (shown in the top band) plus the list rows. */

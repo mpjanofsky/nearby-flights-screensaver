@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "nearby-flights",
   "name": "Nearby Flights",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "apiVersion": 1,
   "minAndroidSdk": 24,
   "entryClass": "me.jxl.kiosk.plugins.flights.FlightsPlugin",
@@ -122,6 +122,18 @@
       "default": 4,
       "group": "Display",
       "description": "List rows below the featured aircraft (the top band)."
+    },
+    {
+      "key": "radarPosition",
+      "title": "Radar position (portrait only)",
+      "type": "select",
+      "options": [
+        "Top",
+        "Bottom"
+      ],
+      "default": "Top",
+      "group": "Display",
+      "description": "Top: under the featured aircraft. Bottom: below the list."
     },
     {
       "key": "excludeGa",

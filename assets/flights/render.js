@@ -54,6 +54,9 @@
   // allows (`mr`, not the number showing, so it never resizes while the screen is up).
   // The text setting grows the fixed parts too, so a bigger size shrinks the scope, not the rows.
   let ROW_H = 74; // list row height in units
+  // Kiosk Satellite shifts the whole page by up to 1.5 % of the width once a minute (burn-in guard). The
+  // stacked layouts fill the height, so without this spare the footer slid off the screen (Portal Mini, #9).
+  const SHIFT_U = 16;
   function layout() {
     const w = innerWidth, h = innerHeight, a = w / h, root = document.documentElement;
     const ts = ((P && P.ts) || 100) / 100, mr = Math.max(1, Math.min(4, (P && P.mr) || 4));
@@ -70,7 +73,7 @@
       } else ROW_H = 74;
     } else {
       const DW = (shape === 'sq' ? 600 : 540) * (1 + (ts - 1) * 0.4), SCOPE_MIN = 260; // wider text needs more width
-      const rows = mr * 80 - 6, fixed = (shape === 'sq' ? 190 : 255) * (1 + (ts - 1) * 0.6) + rows;
+      const rows = mr * 80 - 6, fixed = (shape === 'sq' ? 190 : 255) * (1 + (ts - 1) * 0.6) + rows + SHIFT_U;
       px = Math.min(w / DW, h / (fixed + SCOPE_MIN));
       const spare = h / px - fixed;
       scope = Math.max(SCOPE_MIN, Math.min(spare, w / px - 32, 520));
@@ -78,11 +81,15 @@
     }
     root.classList.toggle('portrait', shape !== 'land');
     root.classList.toggle('sq', shape === 'sq');
+    root.classList.toggle('rb', shape !== 'land' && !!P && P.rp === 'b'); // Radar position: Bottom (portrait only)
     const st = root.style;
     st.setProperty('--px', px + 'px');
     st.setProperty('--v', String(v));
     st.setProperty('--rowh', String(ROW_H));
     st.setProperty('--scope', String(scope));
+    // The tall band is 193 units with an aircraft (grows ~130 per 1.0 of text scale); the quiet-sky band keeps that
+    // height so the scope does not jump when the first aircraft appears. Squarish bands wrap with the text: no floor.
+    st.setProperty('--bandmin', String(shape === 'tall' ? 193 + (ts - 1) * 130 : 0));
     const eff = Math.max(ts, Math.min(ts * (1 + bonus), 1.3)); // setting x aspect bonus, never past 1.3
     st.setProperty('--ts', String(eff));
     st.setProperty('--tsc', String(1 + (eff - 1) * 0.5));

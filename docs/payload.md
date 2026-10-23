@@ -41,6 +41,7 @@ inside the JSON. Each publish is a new document and the page is sandboxed (opaqu
 | `clock` | `"12"`\|`"24"`\|omitted | Clock hour cycle. Omitted follows the device locale; `"24"` uses 00 at midnight. Device time zone and date format are unchanged. Additive: no version bump. |
 | `mr` | int\|omitted | The "Rows" setting (1 to 4); omitted means 4. Lets the renderer size the scope for the most list rows that can appear, so it does not resize when the count changes. Additive: no version bump. |
 | `ts` | number\|omitted | Text size in percent (the "Text size" setting, 80 to 125). Omitted means 100. The renderer scales font sizes only, so long lines elide sooner. Additive: no version bump. |
+| `rp` | `"b"`\|omitted | The "Radar position (portrait only)" setting. `"b"` puts the scope below the list in a stacked (portrait) layout; omitted (the "Top" option) puts it right under the band. Landscape ignores it. Additive: no version bump. |
 | `ft` | string\|omitted | Id of the featured aircraft (the top band). Must match an `ac[].id`; the renderer falls back to the first row if it does not or if `ft` is absent. |
 | `pn` | int\|omitted | Transition (below): how many list rows (not counting the featured aircraft) the previous publish showed. Omitted on the first publish: nothing to animate from. |
 | `msg` | string\|omitted | A calm one-line message shown in place of the aircraft (used for a settings problem Java cannot fix by retrying). Sent with `ac` empty; the renderer shows it in the top band and the stale treatment is not applied. Additive: no version bump. |
