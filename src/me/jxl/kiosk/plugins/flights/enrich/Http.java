@@ -14,6 +14,17 @@ final class Http {
 
   private Http() {}
 
+  /** A non-200 answer; carries the status and the server's Retry-After seconds (0 if none). */
+  static final class StatusException extends IOException {
+    final int code, retryAfterS;
+
+    StatusException(String service, int code, int retryAfterS) {
+      super(service + " HTTP " + code);
+      this.code = code;
+      this.retryAfterS = retryAfterS;
+    }
+  }
+
   /** Null on 404; throws on any other non-200 so the caller backs off. */
   static String get(String url, String userAgent, String service) throws IOException {
     HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
@@ -23,7 +34,9 @@ final class Http {
       c.setRequestProperty("User-Agent", userAgent);
       int code = c.getResponseCode();
       if (code == 404) return null;
-      if (code != 200) throw new IOException(service + " HTTP " + code);
+      if (code != 200) {
+        throw new StatusException(service, code, retryAfterS(c.getHeaderField("Retry-After")));
+      }
       try (InputStream in = c.getInputStream()) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buf = new byte[4096];
@@ -36,6 +49,16 @@ final class Http {
       }
     } finally {
       c.disconnect();
+    }
+  }
+
+  /** Whole seconds, 0 for a missing or HTTP-date value (the normal backoff then applies). */
+  static int retryAfterS(String header) {
+    if (header == null) return 0;
+    try {
+      return Math.max(0, Math.min(3600, Integer.parseInt(header.trim())));
+    } catch (NumberFormatException e) {
+      return 0;
     }
   }
 }

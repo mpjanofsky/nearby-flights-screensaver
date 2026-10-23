@@ -17,6 +17,7 @@ import me.jxl.kiosk.plugins.flights.enrich.AdsbdbLookup;
 import me.jxl.kiosk.plugins.flights.enrich.Enricher;
 import me.jxl.kiosk.plugins.flights.enrich.MergedHexLookup;
 import me.jxl.kiosk.plugins.flights.source.MergedSource;
+import me.jxl.kiosk.plugins.flights.source.NetCooldown;
 import me.jxl.kiosk.plugins.flights.source.ReadsbJsonSource;
 import me.jxl.kiosk.plugins.flights.source.SourceAdapter;
 
@@ -114,20 +115,22 @@ public final class FlightsPlugin implements KioskPlugin {
       publish(PayloadEncoder.message(s.error, System.currentTimeMillis()), 0);
       return;
     }
+    // One adsb.lol cooldown for positions, wider probes and hex lookups: a 429 pauses all three.
+    NetCooldown net = new NetCooldown();
     // adsbdb for hex -> registration/type; adsb.im for callsign routes.
     enricher =
         new Enricher(
             new MergedHexLookup(
                 new AdsbdbLookup(USER_AGENT),
-                new AdsbLolHex(USER_AGENT),
+                new AdsbLolHex(USER_AGENT, net),
                 new AdsbImRoutes(USER_AGENT)));
     enricher.start();
     final int myGen = generation + 1; // the generation schedule() below will start
     engine =
         new Engine(
             s.config,
-            source(s.primary, s.localUrl),
-            NONE_OR(s.fallback, s.localUrl),
+            source(s.primary, s.localUrl, net),
+            NONE_OR(s.fallback, s.localUrl, net),
             // A tick still running when settings change must not publish the old settings' screen.
             (json, genMs) -> {
               synchronized (this) {
@@ -151,18 +154,18 @@ public final class FlightsPlugin implements KioskPlugin {
     if (!paused) schedule(generation, 0);
   }
 
-  private static SourceAdapter NONE_OR(String name, String url) {
-    return PluginSettings.NONE.equals(name) ? null : source(name, url);
+  private static SourceAdapter NONE_OR(String name, String url, NetCooldown net) {
+    return PluginSettings.NONE.equals(name) ? null : source(name, url, net);
   }
 
-  private static SourceAdapter source(String name, String localUrl) {
+  private static SourceAdapter source(String name, String localUrl, NetCooldown net) {
     if (PluginSettings.BOTH.equals(name)) {
       return new MergedSource(
-          ReadsbJsonSource.local(localUrl, USER_AGENT), ReadsbJsonSource.adsbLol(USER_AGENT));
+          ReadsbJsonSource.local(localUrl, USER_AGENT), ReadsbJsonSource.adsbLol(USER_AGENT, net));
     }
     return PluginSettings.LOCAL.equals(name)
         ? ReadsbJsonSource.local(localUrl, USER_AGENT)
-        : ReadsbJsonSource.adsbLol(USER_AGENT);
+        : ReadsbJsonSource.adsbLol(USER_AGENT, net);
   }
 
   private synchronized void schedule(int gen, long delayMs) {

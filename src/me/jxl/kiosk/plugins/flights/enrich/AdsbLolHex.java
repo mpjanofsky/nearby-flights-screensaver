@@ -2,6 +2,7 @@
 package me.jxl.kiosk.plugins.flights.enrich;
 
 import java.io.IOException;
+import me.jxl.kiosk.plugins.flights.source.NetCooldown;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -14,14 +15,25 @@ import org.json.JSONObject;
 public final class AdsbLolHex implements Lookup {
   private static final String BASE = "https://api.adsb.lol/v2/hex/";
   private final String userAgent;
+  private final NetCooldown cooldown;
 
-  public AdsbLolHex(String userAgent) {
+  /** The cooldown is shared with the position source: one 429 pauses both. */
+  public AdsbLolHex(String userAgent, NetCooldown cooldown) {
     this.userAgent = userAgent;
+    this.cooldown = cooldown;
   }
 
   @Override
   public Info aircraft(String hex) throws IOException {
-    String body = Http.get(BASE + hex, userAgent, "adsb.lol");
+    if (cooldown.remainingS() > 0) throw new IOException("adsb.lol paused (rate limited)");
+    String body;
+    try {
+      body = Http.get(BASE + hex, userAgent, "adsb.lol");
+    } catch (Http.StatusException e) {
+      if (e.code == 429 || e.code == 503) cooldown.trip(e.retryAfterS);
+      throw e;
+    }
+    cooldown.ok();
     return body == null ? null : parse(body);
   }
 

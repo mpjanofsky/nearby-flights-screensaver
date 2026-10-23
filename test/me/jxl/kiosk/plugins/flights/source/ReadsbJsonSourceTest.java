@@ -120,4 +120,49 @@ class ReadsbJsonSourceTest {
     for (Aircraft a : r.aircraft) if (!Double.isNaN(a.altitudeM)) withAlt++;
     assertTrue(withAlt > 0 && withAlt <= 18);
   }
+
+  private static Aircraft one(String fields) throws Exception {
+    String body =
+        "{\"aircraft\":[{\"hex\":\"abc123\",\"lat\":40.65,\"lon\":-73.78," + fields + "}]}";
+    return ReadsbJsonSource.parse(body, 1000L, LAT, LON, R).aircraft.get(0);
+  }
+
+  @Test
+  void altitudeComesFromAnyDump1090Spelling() throws Exception {
+    double ft = 0.3048;
+    assertEquals(1225 * ft, one("\"alt_baro\":1225").altitudeM, 1e-6);
+    assertEquals(1225 * ft, one("\"alt_baro\":\"1225\"").altitudeM, 1e-6);
+    assertEquals(1225 * ft, one("\"altitude\":1225").altitudeM, 1e-6); // classic dump1090
+    assertEquals(1300 * ft, one("\"alt_geom\":1300").altitudeM, 1e-6);
+    assertEquals(1225 * ft, one("\"alt_baro\":1225,\"alt_geom\":1300").altitudeM, 1e-6);
+    assertTrue(Double.isNaN(one("\"flight\":\"X\"").altitudeM));
+  }
+
+  @Test
+  void groundIsFlaggedAndNeverFallsBackToAnotherAltitude() throws Exception {
+    Aircraft a = one("\"alt_baro\":\"ground\",\"alt_geom\":-50");
+    assertTrue(a.onGround);
+    assertTrue(Double.isNaN(a.altitudeM));
+  }
+
+  @Test
+  void classicDump1090SpeedAndVerticalRateAreRead() throws Exception {
+    Aircraft a = one("\"altitude\":1225,\"speed\":120,\"vert_rate\":-600");
+    assertEquals(120 * 1852.0 / 3600.0, a.groundSpeedMs, 1e-6);
+    assertEquals(-600 * 0.3048 / 60.0, a.verticalRateMs, 1e-6);
+  }
+
+  @Test
+  void issue12RecordFromClassicDump1090Parses() throws Exception {
+    // Record from public issue #12 (Echo Show 8, dump1090 data.json), position shifted to the test
+    // point.
+    Aircraft a =
+        one(
+            "\"nucp\":7,\"seen_pos\":38.4,\"altitude\":1225,\"vert_rate\":0,\"track\":195,"
+                + "\"speed\":101,\"mlat\":[],\"tisb\":[],\"messages\":22,\"seen\":29.6,\"rssi\":-22.8");
+    assertEquals(1225 * 0.3048, a.altitudeM, 1e-6);
+    assertEquals(101 * 1852.0 / 3600.0, a.groundSpeedMs, 1e-6);
+    assertEquals(0.0, a.verticalRateMs, 1e-9);
+    assertFalse(a.onGround);
+  }
 }

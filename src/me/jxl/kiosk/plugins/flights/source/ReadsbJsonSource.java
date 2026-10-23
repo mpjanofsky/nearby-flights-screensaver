@@ -30,23 +30,25 @@ public final class ReadsbJsonSource implements SourceAdapter {
   private final String id;
   private final String localUrl; // null for adsb.lol
   private final String userAgent;
+  private final NetCooldown cooldown; // null for a LAN feed
   // Only a LAN feed is watched: the server answering says nothing about the receiver behind it.
   private final FeedWatch watch = new FeedWatch();
 
-  private ReadsbJsonSource(String id, String localUrl, String userAgent) {
+  private ReadsbJsonSource(String id, String localUrl, String userAgent, NetCooldown cooldown) {
     this.id = id;
     this.localUrl = localUrl;
     this.userAgent = userAgent;
+    this.cooldown = cooldown;
   }
 
   /** A LAN feed. The URL points at `aircraft.json`; the location never leaves the LAN. */
   public static ReadsbJsonSource local(String aircraftJsonUrl, String userAgent) {
-    return new ReadsbJsonSource("local", aircraftJsonUrl, userAgent);
+    return new ReadsbJsonSource("local", aircraftJsonUrl, userAgent, null);
   }
 
   /** adsb.lol. The query carries a rounded location (see {@link #adsbLolUrl}). */
-  public static ReadsbJsonSource adsbLol(String userAgent) {
-    return new ReadsbJsonSource("net", null, userAgent);
+  public static ReadsbJsonSource adsbLol(String userAgent, NetCooldown cooldown) {
+    return new ReadsbJsonSource("net", null, userAgent, cooldown);
   }
 
   @Override
@@ -96,13 +98,19 @@ public final class ReadsbJsonSource implements SourceAdapter {
       double lat = o.optDouble("lat", Double.NaN), lon = o.optDouble("lon", Double.NaN);
       if (Double.isNaN(lat) || Double.isNaN(lon)) continue;
       if (Geo.distanceM(homeLat, homeLon, lat, lon) > radiusM) continue;
+      // readsb/dump1090-fa say alt_baro; classic dump1090 (data.json) says altitude; both in feet.
       Object alt = o.opt("alt_baro");
       boolean ground = "ground".equals(alt);
-      double altM = alt instanceof Number ? ((Number) alt).doubleValue() * FT_M : Double.NaN;
+      double altFt = feet(alt);
+      if (Double.isNaN(altFt) && !ground) altFt = feet(o.opt("altitude"));
+      if (Double.isNaN(altFt) && !ground) altFt = feet(o.opt("alt_geom"));
+      double altM = altFt * FT_M;
       double rate =
           o.has("baro_rate")
               ? o.optDouble("baro_rate", Double.NaN)
-              : o.optDouble("geom_rate", Double.NaN);
+              : o.has("geom_rate")
+                  ? o.optDouble("geom_rate", Double.NaN)
+                  : o.optDouble("vert_rate", Double.NaN);
       double age = o.has("seen_pos") ? o.optDouble("seen_pos", 0) : o.optDouble("seen", 0);
       out.add(
           new Aircraft(
@@ -114,7 +122,8 @@ public final class ReadsbJsonSource implements SourceAdapter {
               lat,
               lon,
               altM,
-              o.optDouble("gs", Double.NaN) * KT_MS,
+              (o.has("gs") ? o.optDouble("gs", Double.NaN) : o.optDouble("speed", Double.NaN))
+                  * KT_MS,
               o.optDouble("track", Double.NaN),
               rate * FPM_MS,
               age,
@@ -123,12 +132,31 @@ public final class ReadsbJsonSource implements SourceAdapter {
     return new FetchResult(out, observedAtMs, feedNow, feedMessages);
   }
 
+  /** Feet from a JSON number or numeric string; NaN for "ground", null or anything else. */
+  private static double feet(Object v) {
+    if (v instanceof Number) return ((Number) v).doubleValue();
+    if (v instanceof String) {
+      try {
+        return Double.parseDouble(((String) v).trim());
+      } catch (NumberFormatException e) {
+        return Double
+            .NaN; // "ground" and other words: no altitude, which the caller treats as absent
+      }
+    }
+    return Double.NaN;
+  }
+
   private static String text(JSONObject o, String key) {
     String s = o.optString(key, "").trim();
     return s.isEmpty() ? null : s;
   }
 
   private String get(String url) throws SourceException {
+    if (cooldown != null) {
+      int left = cooldown.remainingS();
+      // No request at all while adsb.lol asked us to back off, whichever of our calls tripped it.
+      if (left > 0) throw new SourceException(id + " source paused (rate limited)", null, left);
+    }
     HttpURLConnection c = null;
     try {
       c = (HttpURLConnection) new URL(url).openConnection();
@@ -139,6 +167,7 @@ public final class ReadsbJsonSource implements SourceAdapter {
       int code = c.getResponseCode();
       if (code != 200) {
         int retry = parseRetryAfter(c.getHeaderField("Retry-After"));
+        if (cooldown != null && (code == 429 || code == 503)) cooldown.trip(retry);
         throw new SourceException(id + " source answered HTTP " + code, null, retry);
       }
       try (InputStream in = c.getInputStream()) {
@@ -148,6 +177,7 @@ public final class ReadsbJsonSource implements SourceAdapter {
           buf.write(chunk, 0, n);
           if (buf.size() > MAX_BODY_BYTES) throw new SourceException(id + " response too large");
         }
+        if (cooldown != null) cooldown.ok();
         return new String(buf.toByteArray(), StandardCharsets.UTF_8);
       }
     } catch (IOException e) {

@@ -330,6 +330,41 @@ class EnricherTest {
     assertEquals("FLL", chainFor(new Positioned(), flying(32.0, -97.0, Double.NaN)).origin);
   }
 
+  /** Low and climbing or descending at the given position and track. */
+  static Aircraft moving(double lat, double lon, double track, double altM, double vrMs) {
+    return new Aircraft(
+        "a1", "DAL800", null, null, "A3", lat, lon, altM, 100, track, vrMs, 0, false);
+  }
+
+  @Test
+  void nearTheHomeAirportOfAnOutAndBackTheClimbOrDescentPicksTheLeg() {
+    // 12 km north of ATL flying north: the course fits both legs equally (leaving ATL for Key West
+    // and arriving from Key West both end up here), so only the vertical motion can tell.
+    Info arriving = chainFor(new Chain(), moving(33.75, -84.43, 0, 1200, -5));
+    assertEquals("EYW", arriving.origin);
+    assertEquals("ATL", arriving.destination);
+    Info departing = chainFor(new Chain(), moving(33.75, -84.43, 0, 1200, 8));
+    assertEquals("ATL", departing.origin);
+    assertEquals("EYW", departing.destination);
+  }
+
+  @Test
+  void aClimbOutOfTheDestinationOrADescentIntoTheOriginIsTheReturnLeg() {
+    // FLL to LAX. Arriving at LAX and departing FLL fit; the reverse (reused callsign) do not.
+    assertEquals("FLL", chainFor(new Positioned(), moving(34.0, -118.0, 90, 1200, -5)).origin);
+    assertNull(chainFor(new Positioned(), moving(34.0, -118.0, 90, 1200, 8)).origin);
+    assertEquals("FLL", chainFor(new Positioned(), moving(26.2, -80.3, 90, 1200, 8)).origin);
+    assertNull(chainFor(new Positioned(), moving(26.2, -80.3, 90, 1200, -5)).origin);
+  }
+
+  @Test
+  void levelHighOrDistantMotionSaysNothingAboutTheDirection() {
+    // Level near LAX, a climb at cruise altitude, and a descent far from either end: route stays.
+    assertEquals("FLL", chainFor(new Positioned(), moving(34.0, -118.0, 90, 1200, 0.5)).origin);
+    assertEquals("FLL", chainFor(new Positioned(), moving(34.0, -118.0, 90, 9000, 8)).origin);
+    assertEquals("FLL", chainFor(new Positioned(), moving(32.0, -97.0, 270, 1200, 8)).origin);
+  }
+
   /** PSP-DEN-TPA-ORD: four airports, three different legs. */
   static final class Four implements Lookup {
     public Info aircraft(String hex) {

@@ -58,6 +58,17 @@ Tried it on something else? Please report how it looks.
 
 ## 🚀 Install
 
+### Community Plugins (Recommended)
+
+Nearby Flights is listed in Kiosk Satellite's Community Plugins directory.
+
+[![Install in Kiosk Satellite](https://kiosksatellite.com/img/badges/plugin-add.svg)](https://kiosksatellite.com/redirect/plugin/?repository=mpjanofsky/nearby-flights-screensaver)
+
+Or search for `Nearby Flights` in **Settings > Plugin Manager > Browse plugins**. Then enable the plugin from its row,
+fill in your latitude and longitude, and pick **Nearby Flights** under **Screensaver > Screensaver mode**.
+
+### Manual
+
 1. In Kiosk Satellite, open **Settings > Plugin Manager** (or **Plugin Manager** in Remote Admin)
    and turn on **Enable Plugins**.
 2. Choose **Add plugin**, paste this repository's GitHub URL, and choose **Preview**.
@@ -178,8 +189,9 @@ those in from lookups a few seconds later. A new row can change as details arriv
   the aircraft's hex code.
 - **Routes** are matched by callsign against a community database of scheduled flights. Airlines
   reuse a callsign on different legs, so occasionally you'll see the other leg of the same flight
-  number. The plugin hides a route that doesn't fit where the aircraft actually is, and would
-  rather show less than guess.
+  number, and out-and-back routes such as LGA-BOS-LGA could show the leg not being flown. The plugin
+  uses the aircraft's position, course and whether it is climbing or descending near an airport to
+  pick the leg, hides a route that doesn't fit, and would rather show less than guess.
 
 ## 🔒 Privacy
 

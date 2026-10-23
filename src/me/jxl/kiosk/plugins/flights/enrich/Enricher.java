@@ -179,6 +179,12 @@ public final class Enricher {
    * there, nor without a track.
    */
   private static boolean flyingReverse(Info r, Aircraft a) {
+    // Low and climbing or descending near an end settles it without a course: descending into the
+    // origin or climbing out of the destination is the opposite leg.
+    if (phaseScore(a, new double[] {r.originLat, r.originLon}, new double[] {r.destLat, r.destLon})
+        < 0) {
+      return true;
+    }
     if (Double.isNaN(a.trackDeg)) return false;
     if (Geo.distanceM(a.lat, a.lon, r.originLat, r.originLon) < REVERSE_CLEAR_OF_AIRPORT_M
         || Geo.distanceM(a.lat, a.lon, r.destLat, r.destLon) < REVERSE_CLEAR_OF_AIRPORT_M) {
@@ -186,6 +192,24 @@ public final class Enricher {
     }
     double along = bearingDeg(r.originLat, r.originLon, r.destLat, r.destLon);
     return cosTurn(a.trackDeg, along) < -0.5; // more than 120 degrees off the route's direction
+  }
+
+  /** Below this the aircraft is in the airport's arrival or departure phase. */
+  static final double PHASE_MAX_ALT_M = 3_000, PHASE_MIN_VRATE_MS = 1.5, PHASE_NEAR_M = 50_000;
+
+  /**
+   * Near an airport and climbing or descending, the vertical motion says which end of a leg the
+   * aircraft is at, which the course cannot (approach and departure courses are unrelated to the
+   * leg's direction). Positive when it fits the leg (descending near its destination, climbing near
+   * its origin), negative when it fits the opposite leg, zero when level, high or far.
+   */
+  static double phaseScore(Aircraft a, double[] origin, double[] dest) {
+    if (a.altitudeM > PHASE_MAX_ALT_M || Math.abs(a.verticalRateMs) < PHASE_MIN_VRATE_MS) return 0;
+    double toOrigin = Geo.distanceM(a.lat, a.lon, origin[0], origin[1]);
+    double toDest = Geo.distanceM(a.lat, a.lon, dest[0], dest[1]);
+    if (Math.min(toOrigin, toDest) > PHASE_NEAR_M) return 0;
+    boolean nearDest = toDest < toOrigin;
+    return (a.verticalRateMs < 0) == nearDest ? 3 : -3;
   }
 
   /** Legs whose distance from the aircraft is within this of the nearest count as ambiguous. */
@@ -221,7 +245,7 @@ public final class Enricher {
         double[] o = {r.path[2 * i], r.path[2 * i + 1]}, d = {r.path[2 * i + 2], r.path[2 * i + 3]};
         double towardDest = cosTurn(a.trackDeg, bearingDeg(a.lat, a.lon, d[0], d[1]));
         double awayFromOrigin = cosTurn(a.trackDeg, bearingDeg(o[0], o[1], a.lat, a.lon));
-        double score = towardDest + awayFromOrigin;
+        double score = towardDest + awayFromOrigin + phaseScore(a, o, d);
         if (score > best) {
           best = score;
           pick = i;
