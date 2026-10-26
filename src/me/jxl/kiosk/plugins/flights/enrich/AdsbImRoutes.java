@@ -13,6 +13,8 @@ import org.json.JSONObject;
  */
 public final class AdsbImRoutes implements Lookup {
   private static final String BASE = "https://adsb.im/api/0/route/";
+  // The route endpoint answered in a steady 5.2 s on 2026-10-26, which a 5 s timeout never got.
+  private static final int TIMEOUT_MS = 15_000;
   private final String userAgent;
 
   public AdsbImRoutes(String userAgent) {
@@ -26,7 +28,7 @@ public final class AdsbImRoutes implements Lookup {
 
   @Override
   public Info route(String callsign) throws IOException {
-    String body = Http.get(BASE + callsign, userAgent, "adsb.im");
+    String body = Http.get(BASE + callsign, userAgent, "adsb.im", TIMEOUT_MS);
     return body == null ? null : parseRoute(body);
   }
 

@@ -27,10 +27,16 @@ final class Http {
 
   /** Null on 404; throws on any other non-200 so the caller backs off. */
   static String get(String url, String userAgent, String service) throws IOException {
+    return get(url, userAgent, service, TIMEOUT_MS);
+  }
+
+  /** As above, for a service that is slow to answer. The lookups run one at a time off-thread. */
+  static String get(String url, String userAgent, String service, int timeoutMs)
+      throws IOException {
     HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
     try {
-      c.setConnectTimeout(TIMEOUT_MS);
-      c.setReadTimeout(TIMEOUT_MS);
+      c.setConnectTimeout(timeoutMs);
+      c.setReadTimeout(timeoutMs);
       c.setRequestProperty("User-Agent", userAgent);
       int code = c.getResponseCode();
       if (code == 404) return null;
