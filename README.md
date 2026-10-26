@@ -79,7 +79,9 @@ fill in your latitude and longitude, and pick **Nearby Flights** under **Screens
 
 **Check that it works.** Open Kiosk Satellite's remote web UI and read the plugin's status line (on the device itself it
 only says paused, and the screensaver has to be dismissed to see settings). `Primary source, N aircraft`
-means positions are arriving. Start the screensaver from Kiosk Satellite and within about 30 seconds
+means positions are arriving. The plugin fetches only while its own screensaver is showing; if the device is on
+another screensaver mode the status reads `Paused. Screensaver: <name>`, and it needs the *Choose which
+screensaver shows* permission only to read which mode that is. Start the screensaver from Kiosk Satellite and within about 30 seconds
 you should see aircraft, or "Quiet sky" if nothing is in range. Turn on **Demo: quiet sky** if you
 want to see the empty screen on purpose.
 

@@ -20,6 +20,7 @@ class FlightsPluginTest {
     final List<String> logs = new CopyOnWriteArrayList<>();
     Boolean initiallyActive = true; // null: the read fails
     boolean refuse; // subscribe throws, as without the host.read capability
+    String mode = FlightsPlugin.MODE_ID; // what getScreensaverMode reports; null: the read fails
 
     public void showWindow(String t, String m, String b) {}
 
@@ -42,6 +43,22 @@ class FlightsPluginTest {
     }
 
     public void executeCommand(String c, Map<String, Object> a, CommandCallback cb) {
+      if (c.equals("getScreensaverMode")) {
+        if (mode == null) cb.onResult(false, null, "failed");
+        else {
+          Map<String, Object> d = new HashMap<>();
+          d.put("mode", mode);
+          List<Map<String, Object>> modes = new java.util.ArrayList<>();
+          modes.add(Collections.<String, Object>singletonMap("id", "black"));
+          Map<String, Object> clock = new HashMap<>();
+          clock.put("id", "clock");
+          clock.put("label", "Clock");
+          modes.add(clock);
+          d.put("modes", modes);
+          cb.onResult(true, d, null);
+        }
+        return;
+      }
       if (initiallyActive == null) cb.onResult(false, null, "failed");
       else cb.onResult(true, initiallyActive, null);
     }
@@ -110,6 +127,44 @@ class FlightsPluginTest {
       int n = h.published.size();
       Thread.sleep(300);
       assertEquals(n, h.published.size());
+    } finally {
+      p.stop();
+    }
+  }
+
+  @Test
+  void anotherScreensaverModeKeepsItParkedEvenWhileTheScreensaverIsActive() throws Exception {
+    FakeHost h = new FakeHost();
+    h.mode = "clock";
+    FlightsPlugin p = new FlightsPlugin();
+    try {
+      p.start(h, settings());
+      assertTrue(
+          waitFor(() -> !h.published.isEmpty() && isIdle(h.published.get(h.published.size() - 1))));
+      assertEquals("Paused. Screensaver: Clock", h.statuses.get(h.statuses.size() - 1));
+      int n = h.published.size();
+      Thread.sleep(300);
+      assertEquals(n, h.published.size(), "no polling while another mode shows");
+
+      // The user switches to our mode; the next start of the screensaver reads it.
+      h.mode = FlightsPlugin.MODE_ID;
+      p.onEvent("ks.screensaver.state", state(false));
+      p.onEvent("ks.screensaver.state", state(true));
+      assertTrue(waitFor(() -> !isIdle(h.published.get(h.published.size() - 1))));
+    } finally {
+      p.stop();
+    }
+  }
+
+  @Test
+  void anUnreadableModeKeepsPollingAsBefore() throws Exception {
+    FakeHost h = new FakeHost();
+    h.mode = null;
+    FlightsPlugin p = new FlightsPlugin();
+    try {
+      p.start(h, settings());
+      assertTrue(waitFor(() -> !h.published.isEmpty()));
+      assertFalse(isIdle(h.published.get(0)));
     } finally {
       p.stop();
     }

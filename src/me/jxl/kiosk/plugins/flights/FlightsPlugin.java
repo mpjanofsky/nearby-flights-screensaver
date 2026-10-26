@@ -29,6 +29,9 @@ public final class FlightsPlugin implements KioskPlugin {
       "nearby-flights-screensaver (+https://github.com/mpjanofsky/nearby-flights-screensaver)";
   private static final String KEY = "flights", TITLE = "Nearby Flights";
 
+  /** KS names a plugin screensaver `plugin:PLUGIN_ID:KEY` (the id is the manifest's). */
+  static final String MODE_ID = "plugin:nearby-flights:" + KEY;
+
   private PluginHost host;
   private ScheduledExecutorService worker;
   private Map<String, Object> applied;
@@ -39,17 +42,27 @@ public final class FlightsPlugin implements KioskPlugin {
   private int generation; // bumped on every configure so a superseded loop stops rescheduling
 
   /**
-   * True while the screensaver is known not to be showing. Fetching stops and the screen is the
-   * idle sky. Starts false and stays false if the host cannot tell us, so a refused or failed read
-   * means polling as before.
+   * True while our screensaver is known not to be showing: none is active, or another mode is.
+   * Fetching stops and the screen is the idle sky. Starts false and stays false if the host cannot
+   * tell us, so a refused or failed read means polling as before.
    */
   private volatile boolean paused;
+
+  // Both inputs assume "showing" until the host says otherwise (fail open). Guarded by this.
+  private boolean screensaverActive = true;
+  private boolean ourModeShowing = true;
 
   /** True when the tick loop ended because of {@link #paused} and must be restarted on resume. */
   private boolean loopParked;
 
   /** Why the host refused the last publish, or null. Shown on the status line (issue #10). */
   private volatile String publishProblem;
+
+  /** The name KS gives the screensaver showing now (its own label, else the id), or null. */
+  private volatile String modeLabel;
+
+  /** Why the mode read failed, or null. Shown on the status line so a fail-open is visible. */
+  private volatile String modeProblem;
 
   private ScheduledFuture<?> next; // the waiting tick, cancelled on pause
   private boolean ticking; // a tick is running now, and will schedule the next itself
@@ -82,15 +95,85 @@ public final class FlightsPlugin implements KioskPlugin {
     }
   }
 
-  /** Pauses or resumes fetching when the screensaver hides or shows. */
+  /**
+   * The screensaver started or stopped. "Active" is true for any mode (black, clock, another
+   * plugin), so on a start we also ask which mode it is; a device left on another mode would
+   * otherwise keep polling all day.
+   */
   private synchronized void setActive(boolean active) {
-    if (active != paused) return; // no change (paused is the opposite of active)
-    paused = !active;
+    screensaverActive = active;
+    if (active) readMode();
+    applyPaused();
+  }
+
+  /**
+   * Reads the mode that shows now. The callback only flips a flag (the 3 s lifecycle deadline), and
+   * a failed or unreadable answer counts as ours, so the worst case is polling as before.
+   */
+  private void readMode() {
+    try {
+      host.executeCommand(
+          "getScreensaverMode",
+          Collections.<String, Object>emptyMap(),
+          (ok, data, error) -> {
+            boolean ours = true;
+            modeProblem = null;
+            if (ok && data instanceof Map) {
+              Object mode = ((Map<?, ?>) data).get("mode");
+              if (mode instanceof String) {
+                ours = MODE_ID.equals(mode);
+                // KS labels ours "Title (Plugin Name)", which repeats itself here.
+                modeLabel = ours ? TITLE : labelOf((String) mode, ((Map<?, ?>) data).get("modes"));
+              } else {
+                modeProblem = "no mode in the answer";
+              }
+            } else {
+              // The host's text is about the host, never about our data; shortened like a publish
+              // refusal.
+              String e = error == null ? "" : ": " + error;
+              modeProblem =
+                  ok ? "unexpected answer" : "refused" + (e.length() > 60 ? e.substring(0, 60) : e);
+            }
+            setModeOurs(ours);
+          });
+    } catch (RuntimeException e) {
+      modeProblem = e.getClass().getSimpleName();
+      host.log("screensaver mode unavailable: " + modeProblem);
+    }
+  }
+
+  /** The label KS lists for this mode id, or the id itself when it lists none. */
+  private static String labelOf(String id, Object modes) {
+    if (modes instanceof Iterable) {
+      for (Object m : (Iterable<?>) modes) {
+        if (m instanceof Map && id.equals(((Map<?, ?>) m).get("id"))) {
+          Object label = ((Map<?, ?>) m).get("label");
+          if (label instanceof String && !((String) label).isEmpty()) return (String) label;
+        }
+      }
+    }
+    return id;
+  }
+
+  private synchronized void setModeOurs(boolean ours) {
+    ourModeShowing = ours;
+    applyPaused();
+  }
+
+  /** Pauses or resumes fetching when our screensaver hides or shows. */
+  private synchronized void applyPaused() {
+    boolean wantPaused = !(screensaverActive && ourModeShowing);
+    if (wantPaused == paused) return;
+    paused = wantPaused;
     if (engine == null) return; // settings error: its message screen stays either way
     if (paused) {
       if (next != null) next.cancel(false); // a running tick parks itself when it ends
       loopParked = !ticking;
-      host.status("Paused: screensaver not showing", false);
+      host.status(
+          screensaverActive
+              ? "Paused. Screensaver: " + (modeLabel == null ? "another one" : modeLabel)
+              : "Paused: screensaver not showing",
+          false);
       publish(PayloadEncoder.idle(System.currentTimeMillis()), 0);
     } else {
       engine.forcePublish(); // the idle screen replaced the last one behind the gate's back
@@ -237,8 +320,10 @@ public final class FlightsPlugin implements KioskPlugin {
    * one.
    */
   private String withPublishProblem(String text) {
-    String p = publishProblem;
-    return p == null ? text : text + " | Screensaver not registered (" + p + ")";
+    String p = publishProblem, m = modeProblem;
+    String out = p == null ? text : text + " | Screensaver not registered (" + p + ")";
+    if (m != null) return out + " | Cannot tell which screensaver shows (" + m + ")";
+    return modeLabel == null || paused ? out : out + " | Screensaver: " + modeLabel;
   }
 
   private void stopEnricher() {
@@ -266,6 +351,8 @@ public final class FlightsPlugin implements KioskPlugin {
   public synchronized void stop() {
     generation++;
     paused = false; // a later start() reads the state afresh
+    screensaverActive = true;
+    ourModeShowing = true;
     loopParked = false;
     applied = null; // a later start() with unchanged settings must rebuild, not skip as a no-op
     stopWorker();
