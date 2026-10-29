@@ -117,6 +117,34 @@ class EngineTest {
   }
 
   @Test
+  void demoQuietSendsNoLookupsForAircraftItNeverShows() {
+    Config demo =
+        new Config(
+            PipelineTest.LAT,
+            PipelineTest.LON,
+            15 * 1852.0,
+            "av",
+            4,
+            false,
+            Config.Widen.HARD,
+            15 * 1852.0,
+            true);
+    me.jxl.kiosk.plugins.flights.enrich.Enricher en =
+        new me.jxl.kiosk.plugins.flights.enrich.Enricher(
+            new me.jxl.kiosk.plugins.flights.enrich.Lookup() {
+              public me.jxl.kiosk.plugins.flights.enrich.Info aircraft(String hex) {
+                return null;
+              }
+
+              public me.jxl.kiosk.plugins.flights.enrich.Info route(String cs) {
+                return null;
+              }
+            });
+    new Engine(demo, new Fake("local"), null, new Sink(), REFRESH, en).tick(0);
+    assertFalse(en.hasPending(), "no lookup is queued while the sky is hidden");
+  }
+
+  @Test
   void heartbeatKeepsAnUnchangingFeedFresh() {
     Fake p = new Fake("local");
     Sink s = new Sink();

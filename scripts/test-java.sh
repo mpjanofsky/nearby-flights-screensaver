@@ -5,10 +5,12 @@ set -u
 cd "$(dirname "$0")/.."
 J=${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}; L=tools/lib
 # The plugin class is compiled too (with the SDK jar) so its screensaver gate can be tested with a fake host.
-CP="$L/junit-platform-console-standalone-1.11.4.jar:$L/json-20240303.jar:dist/kiosk-plugin-sdk-1.jar"
+# android.jar is last, for the native view classes the SDK and the plugin refer to (compile only; nothing here draws).
+aj=$(ls -d "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/platforms/android-*/android.jar 2>/dev/null | sort -V | tail -1)
+CP="$L/junit-platform-console-standalone-1.11.4.jar:$L/json-20240303.jar:dist/kiosk-plugin-sdk-1.jar:$aj"
 out=$(mktemp -d)
 "$J/bin/javac" -nowarn -d "$out" -cp "$CP" \
-  $(ls src/me/jxl/kiosk/plugins/flights/*.java) src/me/jxl/kiosk/plugins/flights/source/*.java src/me/jxl/kiosk/plugins/flights/enrich/*.java \
+  $(ls src/me/jxl/kiosk/plugins/flights/*.java) src/me/jxl/kiosk/plugins/flights/source/*.java src/me/jxl/kiosk/plugins/flights/enrich/*.java src/me/jxl/kiosk/plugins/flights/nativeview/*.java \
   $(find test -name '*.java') || exit 1
 "$J/bin/java" -jar "$L/junit-platform-console-standalone-1.11.4.jar" execute --class-path "$out:$L/json-20240303.jar:dist/kiosk-plugin-sdk-1.jar" \
   --scan-class-path "$out" --details=none --disable-banner 2>&1 | grep -E "✘|Failures|MethodSource|=>|tests failed" | head -30

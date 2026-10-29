@@ -16,6 +16,7 @@ import me.jxl.kiosk.plugins.flights.enrich.AdsbLolHex;
 import me.jxl.kiosk.plugins.flights.enrich.AdsbdbLookup;
 import me.jxl.kiosk.plugins.flights.enrich.Enricher;
 import me.jxl.kiosk.plugins.flights.enrich.MergedHexLookup;
+import me.jxl.kiosk.plugins.flights.nativeview.NativeScope;
 import me.jxl.kiosk.plugins.flights.source.MergedSource;
 import me.jxl.kiosk.plugins.flights.source.NetCooldown;
 import me.jxl.kiosk.plugins.flights.source.ReadsbJsonSource;
@@ -31,6 +32,8 @@ public final class FlightsPlugin implements KioskPlugin {
 
   /** KS names a plugin screensaver `plugin:PLUGIN_ID:KEY` (the id is the manifest's). */
   static final String MODE_ID = "plugin:nearby-flights:" + KEY;
+
+  static final String NATIVE_MODE_ID = "plugin:nearby-flights:" + NativeScope.KEY;
 
   private PluginHost host;
   private ScheduledExecutorService worker;
@@ -70,9 +73,20 @@ public final class FlightsPlugin implements KioskPlugin {
   @Override
   public synchronized void start(PluginHost host, Map<String, Object> settings) {
     this.host = host;
+    registerNative();
     configure(settings);
     watchScreensaver();
     host.log("Nearby Flights started");
+  }
+
+  /** The beta: a second, native-view screensaver beside the HTML one (the default). */
+  private void registerNative() {
+    try {
+      NativeScope.register(host);
+    } catch (RuntimeException | LinkageError e) {
+      // Safe: a Kiosk Satellite without native screensavers just does not list the beta mode.
+      host.log("native screensaver unavailable: " + e.getClass().getSimpleName());
+    }
   }
 
   /**
@@ -121,7 +135,7 @@ public final class FlightsPlugin implements KioskPlugin {
             if (ok && data instanceof Map) {
               Object mode = ((Map<?, ?>) data).get("mode");
               if (mode instanceof String) {
-                ours = MODE_ID.equals(mode);
+                ours = MODE_ID.equals(mode) || NATIVE_MODE_ID.equals(mode);
                 // KS labels ours "Title (Plugin Name)", which repeats itself here.
                 modeLabel = ours ? TITLE : labelOf((String) mode, ((Map<?, ?>) data).get("modes"));
               } else {
@@ -295,6 +309,24 @@ public final class FlightsPlugin implements KioskPlugin {
     schedule(gen, delay);
   }
 
+  /** The beta view takes the same payload, no new document. It must never block the HTML page. */
+  private void updateNative(String payloadJson) {
+    try {
+      NativeScope.update(payloadJson);
+    } catch (RuntimeException | LinkageError e) {
+      // Safe: the HTML screensaver is already published; the beta view just keeps its last payload.
+      host.log("native view update failed: " + e.getClass().getSimpleName());
+    }
+  }
+
+  private static String nativeStats() {
+    try {
+      return NativeScope.stats();
+    } catch (RuntimeException | LinkageError e) {
+      return null; // Safe: the status line only loses the beta's frame-rate note.
+    }
+  }
+
   private void publish(String payloadJson, long genMs) {
     try {
       // replaceFirst: the page's own code must never contain the marker, but be safe anyway.
@@ -302,6 +334,7 @@ public final class FlightsPlugin implements KioskPlugin {
           FlightsHtml.html().replaceFirst("/\\*PAYLOAD\\*/", Matcher.quoteReplacement(payloadJson));
       host.publishScreensaver(KEY, TITLE, html);
       publishProblem = null;
+      updateNative(payloadJson);
     } catch (RuntimeException e) {
       // The host refuses when the screensaver capability is not granted or screensavers are
       // unavailable; the plugin then never appears in Kiosk Satellite's screensaver list while the
@@ -322,6 +355,8 @@ public final class FlightsPlugin implements KioskPlugin {
   private String withPublishProblem(String text) {
     String p = publishProblem, m = modeProblem;
     String out = p == null ? text : text + " | Screensaver not registered (" + p + ")";
+    String nativeStats = nativeStats();
+    if (nativeStats != null) out += " | " + nativeStats;
     if (m != null) return out + " | Cannot tell which screensaver shows (" + m + ")";
     return modeLabel == null || paused ? out : out + " | Screensaver: " + modeLabel;
   }

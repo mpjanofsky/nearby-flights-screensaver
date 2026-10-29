@@ -266,7 +266,7 @@ public final class Engine {
    * took to get a route after it first reached the display.
    */
   private void observe(long nowMs) {
-    if (enricher == null) return;
+    if (enricher == null || config.demoQuiet) return; // nothing is shown, so nothing to count
     int routeRows = 0, route = 0, airline = 0, reg = 0, callsign = 0;
     java.util.Set<String> now = new java.util.HashSet<>();
     for (Tracked t : rows) {
@@ -305,7 +305,9 @@ public final class Engine {
   }
 
   private List<Tracked> withEnrichment(List<Tracked> in, long nowMs) {
-    if (enricher == null) return in;
+    // Demo quiet is a preview of the empty screen: the feed keeps flowing (health), but no route or
+    // hex lookup is sent for aircraft that are never shown.
+    if (enricher == null || config.demoQuiet) return in;
     List<Tracked> out = new ArrayList<>(in.size());
     for (int i = 0; i < in.size(); i++) {
       Tracked t = in.get(i);

@@ -8,6 +8,18 @@ the coordinates you enter, live.
 *The sample screens in this README use made-up traffic. The scope is a sketch of where things are,
 not a map.*
 
+> 🧪 **New: a beta native screensaver.** Version 0.10.0 adds a second screensaver, **Nearby Flights
+> (beta, native)**, that is drawn directly. This allows for smoother animation, like labels that glide
+> into place and aircraft that fade in.
+>
+> - **Nothing changes unless you switch:** the original version stays the default for now.
+> - **To try it:** change your screensaver setting to **Nearby Flights (beta, native)** in the Kiosk
+>   Satellite screensaver settings.
+> - Kiosk Satellite 2026.10.35 or newer is required.
+> - The natively drawn screensaver will replace the original version in a future release.
+>
+> Notice anything strange? Open an issue and include your screen size and device.
+
 ## Contents
 
 - [What you get](#-what-you-get)
@@ -37,9 +49,9 @@ or both. No account or key needed.
 
 | | |
 |---|---|
-| **Needs** | Kiosk Satellite with plugin support (plugin API version 1) on Android 7.0 or newer |
+| **Needs** | Kiosk Satellite with plugin support (plugin API version 1) on Android 7.0 or newer. The beta native screensaver needs Kiosk Satellite 2026.10.35 or newer |
 | **Tested on** | Echo Show 5 (960 × 480) |
-| **Should work on** | Landscape and portrait screens of any shape: the layout rescales (wide, 16:10, 4:3, square) and stacks when the screen is taller than wide. I checked sizes from 800 × 480 to 2560 × 1600, such as 1280 × 800 (Echo Show 8, Meta Portal) and 1920 × 1200 tablets, in a desktop browser, not on real hardware. |
+| **Should work on** | Landscape and portrait screens of any shape: the layout rescales (wide, 16:10, 4:3, square) and stacks when the screen is taller than wide. The layout maths is tested against sizes from 800 × 480 to 2560 × 1600, such as 1280 × 800 (Echo Show 8, Meta Portal) and 1920 × 1200 tablets; only the Echo Show 5 has been looked at on real hardware. |
 
 Tried it on something else? Please report how it looks.
 
@@ -91,13 +103,6 @@ Two Kiosk Satellite settings can get in the way:
   this plugin during those hours. Turn the schedule off or leave gaps in it.
 - **Its clock and weather widgets draw on top.** The plugin has its own clock in the top right,
   so switch those widgets off for the screensaver. Pixel shift can stay on.
-
-**Installing from a ZIP instead.** Download `nearby-flights-<version>.zip` from the
-[Releases page](https://github.com/mpjanofsky/nearby-flights-screensaver/releases) (a `.sha256` file sits next to it), or build it yourself with
-[docs/DEVELOPING.md](docs/DEVELOPING.md). Then use **Plugin Manager > Developer Tools > Install
-from ZIP**. That route is meant for testing. Installing a newer ZIP over an old one keeps your
-settings. To switch from a GitHub install to a local build, uninstall first, which deletes the
-settings.
 
 ## 👀 What's on the screen
 

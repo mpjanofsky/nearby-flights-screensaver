@@ -9,7 +9,8 @@ note() { echo "FAIL: $*"; fail=1; }
 # The Java checks compile against the plugin SDK interfaces; a fresh clone has no dist/ yet.
 if [ ! -f dist/kiosk-plugin-sdk-1.jar ]; then
   J=${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}; sdkc=$(mktemp -d); mkdir -p dist
-  "$J/bin/javac" --release 8 -d "$sdkc" $(find sdk/src -name '*.java') && "$J/bin/jar" cf dist/kiosk-plugin-sdk-1.jar -C "$sdkc" . || note "could not build the SDK jar"
+  ajs=$(ls -d "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/platforms/android-*/android.jar 2>/dev/null | sort -V | tail -1)
+  "$J/bin/javac" --release 8 -cp "$ajs" -d "$sdkc" $(find sdk/src -name '*.java') && "$J/bin/jar" cf dist/kiosk-plugin-sdk-1.jar -C "$sdkc" . || note "could not build the SDK jar"
   rm -rf "$sdkc"
 fi
 out=$(node --test assets/flights/lib.test.js 2>&1) || { note "renderer tests"; echo "$out" | grep -E "✖|Error" | head -20; }
