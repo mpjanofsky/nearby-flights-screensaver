@@ -10,7 +10,7 @@ aj=$(ls -d "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/platforms/android-*/andr
 CP="$L/junit-platform-console-standalone-1.11.4.jar:$L/json-20240303.jar:dist/kiosk-plugin-sdk-1.jar:$aj"
 out=$(mktemp -d)
 "$J/bin/javac" -nowarn -d "$out" -cp "$CP" \
-  $(ls src/me/jxl/kiosk/plugins/flights/*.java) src/me/jxl/kiosk/plugins/flights/source/*.java src/me/jxl/kiosk/plugins/flights/enrich/*.java src/me/jxl/kiosk/plugins/flights/nativeview/*.java \
+  $(ls src/me/jxl/kiosk/plugins/flights/*.java) src/me/jxl/kiosk/plugins/flights/source/*.java src/me/jxl/kiosk/plugins/flights/enrich/*.java src/me/jxl/kiosk/plugins/flights/nativeview/*.java src/me/jxl/kiosk/plugins/flights/weather/*.java \
   $(find test -name '*.java') || exit 1
 "$J/bin/java" -jar "$L/junit-platform-console-standalone-1.11.4.jar" execute --class-path "$out:$L/json-20240303.jar:dist/kiosk-plugin-sdk-1.jar" \
   --scan-class-path "$out" --details=none --disable-banner 2>&1 | grep -E "✘|Failures|MethodSource|=>|tests failed" | head -30

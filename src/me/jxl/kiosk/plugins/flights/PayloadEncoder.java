@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import me.jxl.kiosk.plugins.flights.enrich.NNumber;
 import me.jxl.kiosk.plugins.flights.source.Aircraft;
+import me.jxl.kiosk.plugins.flights.weather.Weather;
 
 /**
  * Encodes payload v2 (docs/payload.md) as compact JSON with a fixed key order, so equal content
@@ -88,6 +89,20 @@ public final class PayloadEncoder {
       String featuredId,
       List<Airports.Marker> airports,
       Transition change) {
+    return encode(rows, c, h, genMs, observedAtMs, featuredId, airports, change, null);
+  }
+
+  /** `weather` is the current weather to show (null: none, `wx` omitted). */
+  static String encode(
+      List<Tracked> rows,
+      Config c,
+      Health h,
+      long genMs,
+      long observedAtMs,
+      String featuredId,
+      List<Airports.Marker> airports,
+      Transition change,
+      Weather weather) {
     StringBuilder s = new StringBuilder(1024);
     s.append("{\"v\":2,\"gen\":").append(genMs);
     s.append(",\"fa\":").append(Double.isNaN(h.fetchAgeS) ? "null" : num(h.fetchAgeS, 1));
@@ -104,7 +119,7 @@ public final class PayloadEncoder {
     s.append(",\"ac\":[");
     for (int i = 0; i < rows.size(); i++) {
       if (i > 0) s.append(',');
-      aircraft(s, rows.get(i), genMs, observedAtMs, change, true);
+      aircraft(s, rows.get(i), genMs, observedAtMs, change, true, c.cityNames);
     }
     s.append("],\"ap\":[");
     for (int i = 0; i < airports.size(); i++) {
@@ -115,14 +130,41 @@ public final class PayloadEncoder {
       s.append('}');
     }
     s.append(']');
+    if (weather != null) s.append(",\"wx\":").append(wx(weather));
     if (change != null && !change.gone.isEmpty()) {
       s.append(",\"gone\":[");
       for (int i = 0; i < change.gone.size(); i++) {
         if (i > 0) s.append(',');
-        aircraft(s, change.gone.get(i), genMs, observedAtMs, change, false); // no trail: not drawn
+        aircraft(
+            s,
+            change.gone.get(i),
+            genMs,
+            observedAtMs,
+            change,
+            false,
+            c.cityNames); // no trail: not drawn
       }
       s.append(']');
     }
+    s.append('}');
+    return s.toString();
+  }
+
+  /**
+   * `{c: condition (omitted if unknown), t: degrees C, tu: "C" or "F", w: wind m/s, wu: the unit to
+   * show it in, wd: degrees it blows from (the last two omitted when unknown), sh: pieces to show
+   * (omitted when the default)}`.
+   */
+  static String wx(Weather w) {
+    StringBuilder s = new StringBuilder(48).append('{');
+    if (w.condition != null) s.append("\"c\":").append(str(w.condition)).append(',');
+    s.append("\"t\":").append(num(w.tempC, 1));
+    s.append(",\"tu\":\"").append(w.fahrenheit ? 'F' : 'C').append('"');
+    if (!Double.isNaN(w.windMs)) {
+      s.append(",\"w\":").append(num(w.windMs, 1)).append(",\"wu\":").append(str(w.windUnit));
+      if (!Double.isNaN(w.windDeg)) s.append(",\"wd\":").append(Math.round(w.windDeg) % 360);
+    }
+    if (!Weather.ALL.equals(w.show)) s.append(",\"sh\":").append(str(w.show));
     s.append('}');
     return s.toString();
   }
@@ -133,7 +175,8 @@ public final class PayloadEncoder {
       long genMs,
       long observedAtMs,
       Transition change,
-      boolean withTrail) {
+      boolean withTrail,
+      boolean cityNames) {
     Aircraft a = t.aircraft;
     double ageS = a.positionAgeS + (genMs - observedAtMs) / 1000.0;
     s.append("{\"id\":").append(str(a.hex));
@@ -151,9 +194,14 @@ public final class PayloadEncoder {
     opt(s, "rg", registration(t));
     opt(s, "ty", a.type != null ? a.type : t.info.type);
     opt(s, "al", t.info.airlineIcao);
-    opt(s, "an", t.info.airlineName);
+    opt(s, "an", me.jxl.kiosk.plugins.flights.enrich.Airlines.tidy(t.info.airlineName));
     opt(s, "o", t.info.origin);
     opt(s, "d", t.info.destination);
+    if (cityNames) {
+      Airports ap = Airports.shared();
+      opt(s, "oc", ap.cityRoute(t.info.origin));
+      opt(s, "dc", ap.cityRoute(t.info.destination));
+    }
     optNum(s, "alt", a.altitudeM, 0);
     optNum(s, "gs", a.groundSpeedMs, 1);
     optNum(s, "trk", a.trackDeg, 0);

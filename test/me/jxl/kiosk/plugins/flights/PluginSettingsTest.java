@@ -209,6 +209,37 @@ class PluginSettingsTest {
     assertFalse(PluginSettings.parse(m).config.radarBottom);
   }
 
+  @Test
+  void cityNamesDefaultToOffAndOnlyTheOnSettingSendsThem() throws Exception {
+    Map<String, Object> m = ok();
+    assertFalse(PluginSettings.parse(m).config.cityNames);
+    m.put("cityNames", true);
+    Config c = PluginSettings.parse(m).config;
+    assertTrue(c.cityNames);
+    assertTrue(c.withRadius(60 * 1852.0).cityNames);
+    java.util.List<Tracked> rows = TransitionTest.rows("a");
+    Tracked t =
+        rows.get(0)
+            .withInfo(
+                new me.jxl.kiosk.plugins.flights.enrich.Info(null, null, null, null, "LGW", "AGP"));
+    String on = payload(c, t), off = payload(PluginSettings.parse(ok()).config, t);
+    org.json.JSONObject a = new org.json.JSONObject(on).getJSONArray("ac").getJSONObject(0);
+    assertEquals("London", a.getString("oc"));
+    assertEquals("M\u00e1laga", a.getString("dc"));
+    assertEquals("LGW", a.getString("o")); // the codes stay: the renderer falls back to them
+    assertFalse(new org.json.JSONObject(off).getJSONArray("ac").getJSONObject(0).has("oc"));
+  }
+
+  private static String payload(Config c, Tracked t) {
+    return PayloadEncoder.encode(
+        java.util.Collections.singletonList(t),
+        c,
+        new PayloadEncoder.Health(0, false, "local"),
+        1,
+        1,
+        null);
+  }
+
   private static org.json.JSONObject encode(Config c) {
     return new org.json.JSONObject(
         PayloadEncoder.encode(
@@ -217,5 +248,75 @@ class PluginSettingsTest {
             new PayloadEncoder.Health(0, false, "local"),
             1,
             1));
+  }
+
+  @Test
+  void weatherIsOffUnlessSwitchedOnWithAWeatherEntity() {
+    assertEquals("", PluginSettings.parse(ok()).weatherEntity);
+    Map<String, Object> m = ok();
+    m.put("weatherEntity", "weather.openweathermap"); // chosen, but the switch is off
+    assertEquals("", PluginSettings.parse(m).weatherEntity);
+    assertNull(PluginSettings.parse(m).weatherProblem);
+    m.put("showWeather", true);
+    assertEquals("weather.openweathermap", PluginSettings.parse(m).weatherEntity);
+    assertNull(PluginSettings.parse(m).weatherProblem);
+  }
+
+  @Test
+  void weatherPiecesDefaultToTemperatureAndIconWithWordAndEachCanBeChanged() {
+    Map<String, Object> m = ok();
+    m.put("showWeather", true);
+    m.put("weatherEntity", "weather.home");
+    assertEquals("tci", PluginSettings.parse(m).weatherShow);
+    m.put("weatherConditions", "Word only");
+    assertEquals("tc", PluginSettings.parse(m).weatherShow);
+    m.put("weatherConditions", "Icon only");
+    m.put("weatherTemp", false);
+    assertEquals("i", PluginSettings.parse(m).weatherShow);
+    m.put("weatherConditions", "Something from another version");
+    assertEquals("ci", PluginSettings.parse(m).weatherShow);
+  }
+
+  @Test
+  void windIsOffByDefaultAndTheSelectAddsSpeedAndDirection() {
+    Map<String, Object> m = ok();
+    m.put("showWeather", true);
+    m.put("weatherEntity", "weather.home");
+    assertEquals("tci", PluginSettings.parse(m).weatherShow);
+    m.put("weatherWind", "Speed");
+    assertEquals("tciw", PluginSettings.parse(m).weatherShow);
+    m.put("weatherWind", "Speed and direction");
+    assertEquals("tciwd", PluginSettings.parse(m).weatherShow);
+    m.put("weatherTemp", false);
+    m.put("weatherConditions", "Off");
+    assertEquals("wd", PluginSettings.parse(m).weatherShow); // wind alone is a line
+    assertEquals("weather.home", PluginSettings.parse(m).weatherEntity);
+  }
+
+  @Test
+  void weatherWithEveryPieceOffIsReportedNotFollowed() {
+    Map<String, Object> m = ok();
+    m.put("showWeather", true);
+    m.put("weatherEntity", "weather.home");
+    m.put("weatherTemp", false);
+    m.put("weatherConditions", "Off");
+    PluginSettings s = PluginSettings.parse(m);
+    assertEquals("", s.weatherEntity);
+    assertNotNull(s.weatherProblem);
+    assertNull(s.error);
+  }
+
+  @Test
+  void weatherOnWithoutAUsableEntityIsReportedNotFollowed() {
+    Map<String, Object> m = ok();
+    m.put("showWeather", true);
+    PluginSettings s = PluginSettings.parse(m);
+    assertEquals("", s.weatherEntity);
+    assertNotNull(s.weatherProblem);
+    m.put("weatherEntity", "sensor.outdoor_temperature");
+    s = PluginSettings.parse(m);
+    assertEquals("", s.weatherEntity);
+    assertNotNull(s.weatherProblem);
+    assertNull(s.error); // the flights still run
   }
 }

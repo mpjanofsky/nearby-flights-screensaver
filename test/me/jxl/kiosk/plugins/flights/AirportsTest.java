@@ -68,4 +68,27 @@ class AirportsTest {
             "\"ap\":[{\"c\":\"BBB\",\"x\":0,\"y\":11120},{\"c\":\"AAA\",\"x\":0,\"y\":0}]"),
         json);
   }
+
+  @Test
+  void cityComesFromTheRecordAfterTheBar() {
+    Airports a = new Airports("AGP 36.678 -4.500 2|M\u00e1laga;XYZ 1.000 1.000 1");
+    assertEquals("M\u00e1laga", a.city("AGP"));
+    assertEquals(null, a.city("XYZ"));
+    assertEquals(1, a.within(1, 1, 5000).size()); // the city does not disturb the coordinates
+  }
+
+  @Test
+  void cityRouteMapsEachStopAndKeepsCodesWithoutACity() {
+    Airports a = new Airports("LGW 51.1 -0.2 2|London;AGP 36.7 -4.5 2|M\u00e1laga;XYZ 1.0 1.0 1");
+    assertEquals("London", a.cityRoute("LGW"));
+    assertEquals("London \u2192 XYZ \u2192 M\u00e1laga", a.cityRoute("LGW \u2192 XYZ \u2192 AGP"));
+    assertEquals(null, a.cityRoute("XYZ")); // nothing to add: send nothing
+    assertEquals(null, a.cityRoute(null));
+  }
+
+  @Test
+  void bundledTableHasCities() {
+    assertEquals("London", Airports.shared().city("LGW"));
+    assertEquals("M\u00e1laga", Airports.shared().city("AGP"));
+  }
 }

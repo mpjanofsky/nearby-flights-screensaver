@@ -11,6 +11,21 @@ import java.util.regex.Pattern;
  * the renderer owns chip colours. Facts, written by us (docs/DATA-SOURCES.md).
  */
 public final class Airlines {
+  /** Legal-name tails that run a registered owner's name on: ", Inc", " LLC", " d/b/a ...". */
+  private static final Pattern LEGAL_TAIL =
+      Pattern.compile("(?i)[,\\s]+(?:inc|llc|ltd|corp|d/b/a|dba)\\b.*$");
+
+  /**
+   * A shorter display name: the part before a legal suffix ("Superior Transportation Associates,
+   * Inc d/b/a ..." becomes "Superior Transportation Associates"). The name is unchanged when that
+   * would leave nothing.
+   */
+  public static String tidy(String name) {
+    if (name == null) return null;
+    String t = LEGAL_TAIL.matcher(name).replaceFirst("").trim();
+    return t.isEmpty() ? name : t;
+  }
+
   private static final Pattern AIRLINE_CALLSIGN = Pattern.compile("^([A-Z]{3})\\d{1,4}[A-Z]{0,2}$");
   private static final Map<String, String> NAMES = new HashMap<>();
 
@@ -122,6 +137,8 @@ public final class Airlines {
       "Icelandair",
       "MXY",
       "Breeze Airways",
+      "ROU",
+      "Air Canada Rouge",
       "OCN",
       "Discover Airlines",
       "VIV",

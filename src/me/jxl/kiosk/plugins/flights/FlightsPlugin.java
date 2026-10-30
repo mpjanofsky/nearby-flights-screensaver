@@ -21,6 +21,9 @@ import me.jxl.kiosk.plugins.flights.source.MergedSource;
 import me.jxl.kiosk.plugins.flights.source.NetCooldown;
 import me.jxl.kiosk.plugins.flights.source.ReadsbJsonSource;
 import me.jxl.kiosk.plugins.flights.source.SourceAdapter;
+import me.jxl.kiosk.plugins.flights.weather.HaWeatherSource;
+import me.jxl.kiosk.plugins.flights.weather.Weather;
+import me.jxl.kiosk.plugins.flights.weather.WeatherSource;
 
 /**
  * Wires settings, sources and the Engine to the host. All network work runs on one daemon thread.
@@ -38,7 +41,7 @@ public final class FlightsPlugin implements KioskPlugin {
   private PluginHost host;
   private ScheduledExecutorService worker;
   private Map<String, Object> applied;
-  private Engine engine;
+  private volatile Engine engine;
   private static final long SUMMARY_EVERY_MS = 5 * 60_000L;
   private long lastSummaryMs;
   private Enricher enricher;
@@ -66,6 +69,12 @@ public final class FlightsPlugin implements KioskPlugin {
 
   /** Why the mode read failed, or null. Shown on the status line so a fail-open is visible. */
   private volatile String modeProblem;
+
+  /** Follows the chosen weather entity, or null when weather is off. */
+  private volatile WeatherSource weatherSource;
+
+  /** The latest weather from it (null: none to show). */
+  private volatile Weather latestWeather;
 
   private ScheduledFuture<?> next; // the waiting tick, cancelled on pause
   private boolean ticking; // a tick is running now, and will schedule the next itself
@@ -205,6 +214,11 @@ public final class FlightsPlugin implements KioskPlugin {
     stopWorker();
     stopEnricher();
     PluginSettings s = PluginSettings.parse(settings);
+    if (weatherSource != null)
+      weatherSource.close(); // the entity changed, or weather was turned off
+    weatherSource = null;
+    latestWeather = null;
+    if (s.weatherProblem != null) host.log(s.weatherProblem);
     if (s.error != null) {
       engine = null;
       host.status(s.error, true);
@@ -237,6 +251,18 @@ public final class FlightsPlugin implements KioskPlugin {
             },
             s.refreshMs,
             enricher);
+    if (!s.weatherEntity.isEmpty()) {
+      WeatherSource ws = new HaWeatherSource(host, s.weatherEntity);
+      weatherSource = ws;
+      // The listener runs on the host's callback thread; the engine reads it at its next refresh.
+      ws.start(
+          w -> {
+            Weather shown = w == null ? null : w.showing(s.weatherShow);
+            latestWeather = shown;
+            Engine e = engine;
+            if (e != null) e.setWeather(shown);
+          });
+    }
     // Daemon thread: a stuck request must never hold up the host's 3 s lifecycle deadline.
     worker =
         Executors.newSingleThreadScheduledExecutor(
@@ -376,6 +402,8 @@ public final class FlightsPlugin implements KioskPlugin {
 
   @Override
   public void onEvent(String event, Map<String, Object> payload) {
+    WeatherSource ws = weatherSource;
+    if (ws != null && ws.onEvent(event, payload)) return;
     if ("ks.screensaver.state".equals(event) && payload != null) {
       Object active = payload.get("active");
       if (active instanceof Boolean) setActive((Boolean) active);
@@ -389,6 +417,8 @@ public final class FlightsPlugin implements KioskPlugin {
     screensaverActive = true;
     ourModeShowing = true;
     loopParked = false;
+    weatherSource = null; // the host has revoked its subscription; start() subscribes again
+    latestWeather = null;
     applied = null; // a later start() with unchanged settings must rebuild, not skip as a no-op
     stopWorker();
     stopEnricher();

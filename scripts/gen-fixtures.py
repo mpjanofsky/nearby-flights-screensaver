@@ -86,7 +86,19 @@ moved = [
 gone = [{k: v for k, v in ac("f00009", 4.0 * NM, -2.0 * NM, 200, 100, 5000, 0, cs="SKW5521", ty="E75L",
                              al="SKW", an="SkyWest", o="DEN", d="SLC").items() if k != "tr"} | dict(pv=2)]
 
+# "Show city names" on: oc/dc carry the route as city names (a chain keeps a code where the table has no city).
+cities = [
+    dict(normal[0], oc="Atlanta", dc="Orlando"),
+    dict(normal[1], oc="Orlando", dc="Portland"),
+    dict(normal[2], o="EWR", d="LAX", oc="Newark", dc="Los Angeles"),
+]
+
 fx = {
+    # Show weather on: wx carries the HA weather entity's condition, degrees C and the unit it shows them in.
+    "weather": base(normal, ft="a1b2c3", wx=dict(c="partlycloudy", t=22.2, tu="F")),
+    # Wind chosen as speed and direction: 3.6 m/s from 315 degrees shown as NW 8 mph (HA's unit).
+    "weather-wind": base(normal, ft="a1b2c3", wx=dict(c="partlycloudy", t=22.2, tu="F", w=3.6, wu="mph", wd=315, sh="tcwd")),
+    "city-names": base(cities, ft="a1b2c3"),
     "transition": base(moved, ft="a4d5e6", pn=3, gone=gone),
     "list-mix": base(mix, ft="0c2f1e"),
     "route-tiers": base(tiers, ft="aa0001"),  # featured: origin only

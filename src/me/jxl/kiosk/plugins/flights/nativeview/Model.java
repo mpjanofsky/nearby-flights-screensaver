@@ -15,7 +15,17 @@ final class Model {
   private static final String[] CARD = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
 
   static final class Ac {
-    String id, name, cs, rg, ty, al, an, o, d;
+    String id,
+        name,
+        cs,
+        rg,
+        ty,
+        al,
+        an,
+        o,
+        d,
+        oc,
+        dc; // oc/dc: city names, only when the setting is on
     double x, y, age, gs = Double.NaN, trk = Double.NaN, alt = Double.NaN, vr = Double.NaN;
     double[][] trail = new double[0][];
 
@@ -41,6 +51,20 @@ final class Model {
   List<Ac> ac = new ArrayList<>();
   List<Object[]> ap = new ArrayList<>(); // {code, x, y}
 
+  /** Weather (payload `wx`): condition or null, degrees C (NaN: none), shown in F when wxF. */
+  String wxCond;
+
+  double wxTempC = Double.NaN;
+  boolean wxF;
+
+  /** Pieces to show (payload `wx.sh`; absent: temperature, condition word and icon, no wind). */
+  boolean wxShowTemp = true, wxShowWord = true, wxShowIcon = true, wxShowWind, wxShowDir;
+
+  /** Wind (payload `wx.w`, `wd`, `wu`): m/s and degrees it blows from (NaN: none), unit to show. */
+  double wxWindMs = Double.NaN, wxWindDeg = Double.NaN;
+
+  String wxWindUnit;
+
   static Model parse(String json, long receivedMs) throws JSONException {
     JSONObject o = new JSONObject(json);
     Model m = new Model();
@@ -57,6 +81,25 @@ final class Model {
     m.idle = o.optBoolean("idle");
     m.msg = o.has("msg") ? o.optString("msg") : null;
     m.ft = o.has("ft") ? o.optString("ft") : null;
+    JSONObject wx = o.optJSONObject("wx");
+    if (wx != null && wx.has("t")) {
+      m.wxTempC = wx.optDouble("t", Double.NaN);
+      m.wxCond = wx.has("c") ? wx.optString("c") : null;
+      m.wxF = "F".equals(wx.optString("tu"));
+      if (wx.has("sh")) {
+        String sh = wx.optString("sh");
+        m.wxShowTemp = sh.indexOf('t') >= 0;
+        m.wxShowWord = sh.indexOf('c') >= 0;
+        m.wxShowIcon = sh.indexOf('i') >= 0;
+        m.wxShowWind = sh.indexOf('w') >= 0;
+        m.wxShowDir = sh.indexOf('d') >= 0;
+      }
+      if (wx.has("w") && wx.has("wu")) {
+        m.wxWindMs = wx.optDouble("w", Double.NaN);
+        m.wxWindDeg = wx.has("wd") ? wx.optDouble("wd", Double.NaN) : Double.NaN;
+        m.wxWindUnit = wx.optString("wu");
+      }
+    }
     JSONArray ac = o.optJSONArray("ac");
     for (int i = 0; ac != null && i < ac.length(); i++) {
       JSONObject j = ac.getJSONObject(i);
@@ -69,6 +112,8 @@ final class Model {
       a.an = str(j, "an");
       a.o = str(j, "o");
       a.d = str(j, "d");
+      a.oc = str(j, "oc");
+      a.dc = str(j, "dc");
       a.name = a.cs != null ? a.cs : a.rg != null ? a.rg : a.id.toUpperCase();
       a.x = j.optDouble("x");
       a.y = j.optDouble("y");
@@ -161,6 +206,66 @@ final class Model {
     if (a.o != null && a.d != null) return a.o + " → " + a.d;
     return a.o != null ? a.o + " → " : null;
   }
+
+  /** Text width in the caller's current paint; lets {@link #routeToShow} stay free of Android. */
+  interface Measure {
+    float width(String s);
+  }
+
+  /** What to draw for a route: the text and the share of the normal size to draw it at. */
+  static final class RouteFit {
+    final String text;
+    final float scale;
+
+    RouteFit(String text, float scale) {
+      this.text = text;
+      this.scale = scale;
+    }
+  }
+
+  /** The smallest a city route is drawn, as a share of the normal size; below it the codes show. */
+  static final float ROUTE_MIN_SCALE = 0.85f;
+
+  /**
+   * The route as city names ("London → Málaga") when the payload has them: at full size when it
+   * fits in `maxW`, else shrunk to fit, down to {@link #ROUTE_MIN_SCALE}; below that, `codeRoute`
+   * at full size. Only the route that matches the aircraft's current codes is swapped; a fading
+   * previous route stays as the codes it was drawn with. `size` is the text size in pixels, for the
+   * arrows, which are drawn rather than typed; `m` measures text at that size.
+   */
+  static RouteFit routeToShow(Ac a, String codeRoute, float size, float maxW, Measure m) {
+    RouteFit codes = new RouteFit(codeRoute, 1f);
+    if ((a.oc == null && a.dc == null) || !codeRoute.equals(route(a))) return codes;
+    String city =
+        (a.oc != null ? a.oc : a.o) + " → " + (a.d == null ? "" : a.dc != null ? a.dc : a.d);
+    if (maxW <= 0) return new RouteFit(city, 1f);
+    String[] parts = city.split(" → ", -1);
+    float w = (parts.length - 1) * ARROW_EM * size;
+    for (String part : parts) w += m.width(part);
+    float scale = Math.min(1f, maxW / w); // text and arrows both grow with the size
+    return scale >= ROUTE_MIN_SCALE ? new RouteFit(city, scale) : codes;
+  }
+
+  /**
+   * The list row's second line, "airline · type", fitted to `maxW` without losing the type: the
+   * full type name if that fits, else the type code, else the airline name cut with an ellipsis.
+   * Rows with only one of the two are returned as they are (the caller's ellipsis handles those).
+   */
+  static String subToShow(Row r, float maxW, Measure m) {
+    String an = r.ac.an == null ? "" : r.ac.an;
+    String code = r.ac.ty == null ? "" : r.ac.ty;
+    String full = Scene.subText(r);
+    if (an.isEmpty() || r.type.isEmpty() || maxW <= 0 || m.width(full) <= maxW) return full;
+    String byCode = an + " · " + code;
+    if (m.width(byCode) <= maxW) return byCode;
+    String tail = " · " + code;
+    int n = an.length();
+    while (n > 4 && m.width(an.substring(0, n) + "…" + tail) > maxW) n--;
+    return an.substring(0, n).trim() + "…" + tail;
+  }
+
+  /** Width of one drawn arrow with its spacing, in text sizes (see ScopeView.route). */
+  static final float ARROW_EM = 1.55f;
 
   /** lib.js spotlight facts line (the part after the callsign and route). */
   static String facts(Row row) {

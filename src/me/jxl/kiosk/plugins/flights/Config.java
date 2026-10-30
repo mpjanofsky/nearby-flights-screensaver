@@ -24,6 +24,11 @@ public final class Config {
    */
   public final boolean radarBottom;
 
+  /**
+   * Show city names for the route where the airport table has them (renderer falls back to codes).
+   */
+  public final boolean cityNames;
+
   /** Longest the top band keeps one aircraft while others are available, in seconds (10..300). */
   public final int featureHoldSec;
 
@@ -145,6 +150,39 @@ public final class Config {
       int textPercent,
       int featureHoldSec,
       boolean radarBottom) {
+    this(
+        homeLat,
+        homeLon,
+        radiusM,
+        units,
+        maxRows,
+        excludeGa,
+        widen,
+        maxRadiusM,
+        demoQuiet,
+        clockFormat,
+        textPercent,
+        featureHoldSec,
+        radarBottom,
+        false);
+  }
+
+  public Config(
+      double homeLat,
+      double homeLon,
+      double radiusM,
+      String units,
+      int maxRows,
+      boolean excludeGa,
+      Widen widen,
+      double maxRadiusM,
+      boolean demoQuiet,
+      String clockFormat,
+      int textPercent,
+      int featureHoldSec,
+      boolean radarBottom,
+      boolean cityNames) {
+    this.cityNames = cityNames;
     this.radarBottom = radarBottom;
     this.textPercent = Math.max(80, Math.min(125, textPercent));
     this.featureHoldSec = Math.max(10, Math.min(300, featureHoldSec));
@@ -175,7 +213,8 @@ public final class Config {
         clockFormat,
         textPercent,
         featureHoldSec,
-        radarBottom);
+        radarBottom,
+        cityNames);
   }
 
   /** Aircraft to publish: the featured one (shown in the top band) plus the list rows. */

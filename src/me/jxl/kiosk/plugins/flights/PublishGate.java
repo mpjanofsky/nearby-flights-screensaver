@@ -2,6 +2,7 @@
 package me.jxl.kiosk.plugins.flights;
 
 import java.util.List;
+import me.jxl.kiosk.plugins.flights.weather.Weather;
 
 /**
  * Decides whether a refresh needs a publish. Time-dependent fields (`gen`, ages, fetch age) are
@@ -26,6 +27,18 @@ public final class PublishGate {
    */
   public synchronized boolean changed(
       List<Tracked> rows, String featuredId, Config c, boolean stale, String sourceId, long nowMs) {
+    return changed(rows, featuredId, c, stale, sourceId, nowMs, null);
+  }
+
+  /** As above; a change in the weather (null: none) also needs a publish. */
+  public synchronized boolean changed(
+      List<Tracked> rows,
+      String featuredId,
+      Config c,
+      boolean stale,
+      String sourceId,
+      long nowMs,
+      Weather weather) {
     StringBuilder s = new StringBuilder();
     s.append(featuredId)
         .append('|')
@@ -35,6 +48,19 @@ public final class PublishGate {
         .append('|')
         .append(Math.round(c.radiusM))
         .append(c.units);
+    if (weather != null) {
+      s.append("|wx,")
+          .append(weather.condition)
+          .append(',')
+          .append(Math.round(weather.tempC * 10))
+          .append(weather.fahrenheit)
+          .append(weather.show)
+          .append(',')
+          .append(Math.round(weather.windMs * 10))
+          .append(',')
+          .append(Math.round(weather.windDeg))
+          .append(weather.windUnit);
+    }
     for (Tracked t : rows) {
       s.append('|')
           .append(t.aircraft.hex)

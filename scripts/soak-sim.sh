@@ -8,6 +8,6 @@ CP="$L/json-20240303.jar:dist/kiosk-plugin-sdk-1.jar"
 out=$(mktemp -d)
 "$J/bin/javac" -nowarn -d "$out" -cp "$CP" \
   src/me/jxl/kiosk/plugins/flights/*.java src/me/jxl/kiosk/plugins/flights/source/*.java \
-  src/me/jxl/kiosk/plugins/flights/enrich/*.java test/me/jxl/kiosk/plugins/flights/SoakMain.java || exit 1
+  src/me/jxl/kiosk/plugins/flights/enrich/*.java src/me/jxl/kiosk/plugins/flights/weather/*.java test/me/jxl/kiosk/plugins/flights/SoakMain.java || exit 1
 "$J/bin/java" -Xmx${2:-48}m -cp "$out:$CP" me.jxl.kiosk.plugins.flights.SoakMain "${1:-30}" "${3:-10}" "${4:-120}"
 status=$?; rm -rf "$out"; exit $status

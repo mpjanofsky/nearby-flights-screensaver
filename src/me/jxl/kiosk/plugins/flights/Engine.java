@@ -8,6 +8,7 @@ import me.jxl.kiosk.plugins.flights.source.Aircraft;
 import me.jxl.kiosk.plugins.flights.source.FetchResult;
 import me.jxl.kiosk.plugins.flights.source.SourceAdapter;
 import me.jxl.kiosk.plugins.flights.source.SourceException;
+import me.jxl.kiosk.plugins.flights.weather.Weather;
 
 /**
  * One refresh cycle: fetch (primary, then fallback), select, diff-gate, encode, publish. Knows
@@ -32,6 +33,7 @@ public final class Engine {
   private final Enricher enricher; // may be null (tests, enrichment off)
   private final Selector selector = new Selector();
   private final PublishGate gate = new PublishGate();
+  private volatile Weather weather; // null: none to show
   private final Featuring featuring;
 
   /** Per shown aircraft: {first shown ms, route-known ms or -1, callsign-known 0/1}. */
@@ -59,7 +61,7 @@ public final class Engine {
    */
   private final java.util.Map<SourceAdapter, Long> coolUntilMs = new java.util.HashMap<>();
 
-  private final Airports airports = new Airports();
+  private final Airports airports = Airports.shared();
 
   /** What the last publish showed, so the next one can say what moved (the page keeps no state). */
   private Transition.Snapshot previous;
@@ -91,6 +93,11 @@ public final class Engine {
     this.sourceId = primary.id();
     this.fetchRadiusM = config.radiusM;
     this.effective = config;
+  }
+
+  /** The latest weather (null: none); it shows from the next refresh. */
+  public void setWeather(Weather w) {
+    weather = w;
   }
 
   /** The screen was replaced behind the gate's back (the idle screen), so publish next tick. */
@@ -338,7 +345,8 @@ public final class Engine {
     // Demo switch: the real data keeps flowing (health, staleness), only the aircraft are hidden.
     List<Tracked> shown = config.demoQuiet ? new ArrayList<Tracked>() : rows;
     String shownFeatured = config.demoQuiet ? null : featuredId;
-    if (!gate.changed(shown, shownFeatured, effective, stale, sourceId, nowMs)) return;
+    Weather wx = weather;
+    if (!gate.changed(shown, shownFeatured, effective, stale, sourceId, nowMs, wx)) return;
     double fetchAgeS = lastOkMs < 0 ? Double.NaN : (nowMs - lastOkMs) / 1000.0;
     String json =
         PayloadEncoder.encode(
@@ -349,7 +357,8 @@ public final class Engine {
             observedAtMs,
             shownFeatured,
             airports.within(effective.homeLat, effective.homeLon, effective.radiusM),
-            Transition.between(previous, shown, nowMs, observedAtMs));
+            Transition.between(previous, shown, nowMs, observedAtMs),
+            wx);
     publisher.publish(json, nowMs);
     previous = new Transition.Snapshot(shown, shownFeatured, observedAtMs);
   }

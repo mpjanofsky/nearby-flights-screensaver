@@ -262,16 +262,33 @@ final class ScopeView extends View {
       float cx = left + inner / 2;
       txt(c, time, cx, top + 52 * tsc * 0.8f * u, 52 * tsc, FG, bold, Paint.Align.CENTER, 1);
       float dateBase = top + (52 * 1.05f * tsc + 15.5f * tsc) * u;
-      if ("stale".equals(st[0])) {
-        txt(c, st[1], cx, dateBase, 20 * tsc, HOT, bold, Paint.Align.CENTER, 1);
-      } else {
-        txt(c, dateFmt.format(now), cx, dateBase, 20 * tsc, DIM, regular, Paint.Align.CENTER, 1);
-      }
+      boolean stale = "stale".equals(st[0]);
+      String dateText = stale ? st[1] : dateFmt.format(now);
+      // The aircraft sits right under this line, so the weather joins it instead of taking a third.
+      String[] wl = WeatherText.candidates(m);
+      float gap = 18 * tsc * u, dateW = measure(dateText, 20 * tsc, stale ? bold : regular);
+      String wxText = wl == null ? null : fitWeather(m, wl, 20 * tsc, inner - dateW - gap);
+      float wxW = wxText == null ? 0 : weatherWidth(m, wxText, 20 * tsc);
+      float total = wxText == null ? dateW : dateW + gap + wxW;
+      float x0 = cx - total / 2;
+      txt(
+          c,
+          dateText,
+          x0,
+          dateBase,
+          20 * tsc,
+          stale ? HOT : DIM,
+          stale ? bold : regular,
+          Paint.Align.LEFT,
+          1);
+      if (wxText != null) weatherLine(c, m, wxText, x0 + dateW + gap, dateBase, 20 * tsc, 1);
       spotW = inner;
     } else {
       // Clock, right aligned, centred in the band: time over date (or the stale note in its place).
       float cr = left + inner;
-      float clockTop = top + ((float) lay.bandH - 9 - 66 * tsc) / 2 * u;
+      // With weather the block is a third line taller, so it is centred as a three-line block.
+      String[] wl = WeatherText.candidates(m);
+      float clockTop = top + ((float) lay.bandH - 9 - (wl == null ? 66 : 84) * tsc) / 2 * u;
       txt(c, time, cr, clockTop + 29.9f * tsc * u, 40 * tsc, FG, bold, Paint.Align.RIGHT, 1);
       float dateBase = clockTop + 57.5f * tsc * u;
       if ("stale".equals(st[0])) {
@@ -279,7 +296,16 @@ final class ScopeView extends View {
       } else {
         txt(c, dateFmt.format(now), cr, dateBase, 20 * tsc, DIM, regular, Paint.Align.RIGHT, 1);
       }
-      spotW = inner - (150 * tsc + 20) * u;
+      float colW = (150 * tsc) * u;
+      if (wl != null) {
+        // The featured aircraft keeps what is left, so the line never runs under it; it falls back
+        // to the temperature alone when the whole line is too wide for a third of the band.
+        String wxText = fitWeather(m, wl, 20 * tsc, inner / 3);
+        float wxW = weatherWidth(m, wxText, 20 * tsc);
+        weatherLine(c, m, wxText, cr - wxW, dateBase + 22 * tsc * u, 20 * tsc, 1);
+        colW = Math.max(colW, wxW);
+      }
+      spotW = inner - colW - 20 * u;
     }
     line.setColor(LINE);
     line.setStrokeWidth(Math.max(1, u));
@@ -370,9 +396,28 @@ final class ScopeView extends View {
       float a) {
     boolean unconfirmed = k.ac.d == null;
     float inA = k.route.in(tick0), outA = k.route.out(tick0);
-    if (outA > 0) route(c, k.route.prev, x, baseline, size, unconfirmed, color, maxW, a * outA);
+    if (outA > 0)
+      routeFit(
+          c,
+          shownRoute(k.ac, k.route.prev, size, maxW),
+          x,
+          baseline,
+          size,
+          unconfirmed,
+          color,
+          maxW,
+          a * outA);
     if (!k.route.cur.isEmpty())
-      route(c, k.route.cur, x, baseline, size, unconfirmed, color, maxW, a * inA);
+      routeFit(
+          c,
+          shownRoute(k.ac, k.route.cur, size, maxW),
+          x,
+          baseline,
+          size,
+          unconfirmed,
+          color,
+          maxW,
+          a * inA);
   }
 
   // ---- list
@@ -410,7 +455,7 @@ final class ScopeView extends View {
     // Baselines measured against the HTML page at 960 x 480 (build/screens): its airline line sits
     // 1 unit higher and its distance 4 higher than the airline line a shared baseline gave.
     float sy = y + 31 * ts * u + 4 * u + 20 * ts * 0.9f * u - u;
-    fieldFaded(c, k.sub, x, sy, 20 * ts, DIM, regular, Paint.Align.LEFT, mainW, a);
+    subFaded(c, k, x, sy, 20 * ts, mainW, a);
     // Right column: altitude (in the scope's colour) and distance. The altitude leaves room for the
     // climb/descent arrow only while there is one.
     int altColor = r.ac.alt != r.ac.alt ? DIM : Fmt.altColor(r.ac.alt);
@@ -432,6 +477,51 @@ final class ScopeView extends View {
   }
 
   /** A text field that cross-fades when its value changes. maxW 0 means no ellipsis. */
+  /**
+   * The airline and type line: fitted so the type survives (Model.subToShow), cross-fading on
+   * change.
+   */
+  private void subFaded(
+      Canvas c, Scene.Craft k, float x, float baseline, float size, float maxW, float a) {
+    float inA = k.sub.in(tick0), outA = k.sub.out(tick0);
+    if (outA > 0)
+      txt(
+          c,
+          fit(k.sub.prev, size, maxW, regular),
+          x,
+          baseline,
+          size,
+          DIM,
+          regular,
+          Paint.Align.LEFT,
+          a * outA);
+    String cur = k.sub.cur;
+    if (cur.equals(Scene.subText(k.row))) {
+      text.setTypeface(regular);
+      text.setTextSize(size * u);
+      cur =
+          Model.subToShow(
+              k.row,
+              maxW,
+              new Model.Measure() {
+                @Override
+                public float width(String s) {
+                  return text.measureText(s);
+                }
+              });
+    }
+    txt(
+        c,
+        fit(cur, size, maxW, regular),
+        x,
+        baseline,
+        size,
+        DIM,
+        regular,
+        Paint.Align.LEFT,
+        a * inA);
+  }
+
   private void fieldFaded(
       Canvas c,
       Scene.Fader f,
@@ -463,7 +553,16 @@ final class ScopeView extends View {
     String route = Model.route(r.ac);
     float ry = y + 44 * t * 1.25f * u + 10 * u;
     if (route != null)
-      route(c, route, left, ry + 40 * t * 0.9f * u, 40 * t, r.ac.d == null, FG, w, a);
+      routeFit(
+          c,
+          shownRoute(r.ac, route, 40 * t, w),
+          left,
+          ry + 40 * t * 0.9f * u,
+          40 * t,
+          r.ac.d == null,
+          FG,
+          w,
+          a);
     float ay = ry + 40 * t * 1.1f * u + 10 * u;
     float aw =
         txt(
@@ -802,6 +901,139 @@ final class ScopeView extends View {
     return text.measureText(s);
   }
 
+  private float measure(String s, float sizeUnits, Typeface face) {
+    text.setTypeface(face);
+    text.setTextSize(sizeUnits * u);
+    return text.measureText(s);
+  }
+
+  /** The longest candidate that fits {@code maxW} pixels with its icon, else the shortest. */
+  private String fitWeather(Model m, String[] candidates, float sizeUnits, float maxW) {
+    for (String s : candidates) if (weatherWidth(m, s, sizeUnits) <= maxW) return s;
+    return candidates[candidates.length - 1];
+  }
+
+  /** Icon (if shown), gap and text, in pixels. */
+  private float weatherWidth(Model m, String s, float sizeUnits) {
+    float icon = WeatherText.hasIcon(m) ? sizeUnits * u * 1.15f : 0;
+    return icon + measure(s, sizeUnits, regular);
+  }
+
+  /** The weather line: its icon, then the text, starting at {@code x} (left edge). */
+  private void weatherLine(
+      Canvas c, Model m, String s, float x, float baseline, float sizeUnits, float alpha) {
+    float em = sizeUnits * u;
+    float textX = x;
+    if (WeatherText.hasIcon(m)) {
+      weatherIcon(c, WeatherText.icon(m.wxCond), x + em * 0.5f, baseline - em * 0.36f, em, alpha);
+      textX = x + em * 1.15f;
+    }
+    if (!s.isEmpty()) txt(c, s, textX, baseline, sizeUnits, DIM, regular, Paint.Align.LEFT, alpha);
+  }
+
+  private void flat(Canvas c, float x, float y, float r, int color, float alpha) {
+    fill.setStyle(Paint.Style.FILL);
+    fill.setColor(color);
+    fill.setAlpha((int) (255 * alpha));
+    c.drawCircle(x, y, r, fill);
+  }
+
+  private void cloud(Canvas c, float x, float y, float s, float alpha) {
+    scratch.reset();
+    scratch.addCircle(x - 0.2f * s, y + 0.04f * s, 0.2f * s, Path.Direction.CW);
+    scratch.addCircle(x + 0.02f * s, y - 0.08f * s, 0.26f * s, Path.Direction.CW);
+    scratch.addCircle(x + 0.25f * s, y + 0.05f * s, 0.18f * s, Path.Direction.CW);
+    scratch.addRect(x - 0.2f * s, y + 0.04f * s, x + 0.25f * s, y + 0.23f * s, Path.Direction.CW);
+    fill.setStyle(Paint.Style.FILL);
+    fill.setColor(0xFFB8C4D2);
+    fill.setAlpha((int) (255 * alpha));
+    c.drawPath(scratch, fill);
+  }
+
+  private void sun(Canvas c, float x, float y, float s, float alpha) {
+    flat(c, x, y, 0.2f * s, HOT, alpha);
+    line.setColor(HOT);
+    line.setAlpha((int) (255 * alpha));
+    line.setStrokeWidth(Math.max(1.5f, s * 0.07f));
+    line.setStyle(Paint.Style.STROKE);
+    line.setStrokeCap(Paint.Cap.ROUND);
+    for (int i = 0; i < 8; i++) {
+      double a = i * Math.PI / 4;
+      c.drawLine(
+          x + (float) Math.cos(a) * 0.3f * s,
+          y + (float) Math.sin(a) * 0.3f * s,
+          x + (float) Math.cos(a) * 0.43f * s,
+          y + (float) Math.sin(a) * 0.43f * s,
+          line);
+    }
+  }
+
+  /** A weather icon centred at (x, y), {@code s} pixels square, from plain shapes. */
+  private void weatherIcon(Canvas c, String kind, float x, float y, float s, float alpha) {
+    line.setStyle(Paint.Style.STROKE);
+    line.setStrokeCap(Paint.Cap.ROUND);
+    line.setStrokeWidth(Math.max(1.5f, s * 0.07f));
+    switch (kind) {
+      case WeatherText.SUN:
+        sun(c, x, y, s, alpha);
+        break;
+      case WeatherText.MOON:
+        flat(c, x, y, 0.3f * s, 0xFFE8EEF5, alpha);
+        flat(c, x + 0.16f * s, y - 0.1f * s, 0.27f * s, BG, 1);
+        break;
+      case WeatherText.PARTLY:
+        sun(c, x - 0.2f * s, y - 0.18f * s, s * 0.7f, alpha);
+        cloud(c, x + 0.08f * s, y + 0.08f * s, s * 0.85f, alpha);
+        break;
+      case WeatherText.CLOUD:
+        cloud(c, x, y, s, alpha);
+        break;
+      case WeatherText.FOG:
+        line.setColor(0xFFB8C4D2);
+        line.setAlpha((int) (255 * alpha));
+        for (int i = -1; i <= 1; i++)
+          c.drawLine(x - 0.36f * s, y + i * 0.2f * s, x + 0.36f * s, y + i * 0.2f * s, line);
+        break;
+      case WeatherText.WIND:
+        line.setColor(0xFFB8C4D2);
+        line.setAlpha((int) (255 * alpha));
+        c.drawLine(x - 0.38f * s, y - 0.15f * s, x + 0.3f * s, y - 0.15f * s, line);
+        c.drawLine(x - 0.38f * s, y + 0.05f * s, x + 0.4f * s, y + 0.05f * s, line);
+        c.drawLine(x - 0.38f * s, y + 0.25f * s, x + 0.2f * s, y + 0.25f * s, line);
+        break;
+      default: // RAIN, SNOW, STORM: a cloud with what falls from it
+        cloud(c, x, y - 0.14f * s, s * 0.9f, alpha);
+        if (WeatherText.STORM.equals(kind)) {
+          scratch.reset();
+          scratch.moveTo(x + 0.04f * s, y + 0.06f * s);
+          scratch.lineTo(x - 0.1f * s, y + 0.3f * s);
+          scratch.lineTo(x + 0.02f * s, y + 0.3f * s);
+          scratch.lineTo(x - 0.06f * s, y + 0.5f * s);
+          scratch.lineTo(x + 0.14f * s, y + 0.24f * s);
+          scratch.lineTo(x + 0.02f * s, y + 0.24f * s);
+          scratch.close();
+          fill.setStyle(Paint.Style.FILL);
+          fill.setColor(HOT);
+          fill.setAlpha((int) (255 * alpha));
+          c.drawPath(scratch, fill);
+        } else if (WeatherText.SNOW.equals(kind)) {
+          for (int i = -1; i <= 1; i++)
+            flat(c, x + i * 0.2f * s, y + 0.36f * s, 0.055f * s, 0xFFE8EEF5, alpha);
+        } else {
+          line.setColor(ACCENT);
+          line.setAlpha((int) (255 * alpha));
+          for (int i = -1; i <= 1; i++)
+            c.drawLine(
+                x + i * 0.2f * s + 0.04f * s,
+                y + 0.18f * s,
+                x + i * 0.2f * s - 0.04f * s,
+                y + 0.44f * s,
+                line);
+        }
+    }
+    line.setStyle(Paint.Style.STROKE); // the shared paint's state before this method
+  }
+
   /** Text sized in pixels (the scope's own scale). */
   private void px(Canvas c, String s, float x, float y, float sizePx, int color, float alpha) {
     px(c, s, x, y, sizePx, color, alpha, Paint.Align.CENTER);
@@ -935,6 +1167,37 @@ final class ScopeView extends View {
   }
 
   /** Route text with a drawn arrow (the page draws it too: the glyph differs between devices). */
+  /** City names where the payload has them and they fit (see Model.routeToShow), else the codes. */
+  private Model.RouteFit shownRoute(Model.Ac ac, String codeRoute, float sizeUnits, float maxW) {
+    text.setTypeface(medium);
+    text.setTextSize(sizeUnits * u);
+    return Model.routeToShow(
+        ac,
+        codeRoute,
+        sizeUnits * u,
+        maxW,
+        new Model.Measure() {
+          @Override
+          public float width(String s) {
+            return text.measureText(s);
+          }
+        });
+  }
+
+  /** Draws a fitted route on the same baseline, smaller when the city names needed shrinking. */
+  private void routeFit(
+      Canvas c,
+      Model.RouteFit fit,
+      float x,
+      float baseline,
+      float sizeUnits,
+      boolean unconfirmed,
+      int color,
+      float maxW,
+      float alpha) {
+    route(c, fit.text, x, baseline, sizeUnits * fit.scale, unconfirmed, color, maxW, alpha);
+  }
+
   private void route(
       Canvas c,
       String route,

@@ -17,6 +17,8 @@ not a map.*
 >   Satellite screensaver settings.
 > - Kiosk Satellite 2026.10.35 or newer is required.
 > - The natively drawn screensaver will replace the original version in a future release.
+> - **New features land in the beta first.** City names and weather (new in 0.10.1) show only in the
+>   native screensaver. Both are off by default; see [Settings](#-settings).
 >
 > Notice anything strange? Open an issue and include your screen size and device.
 
@@ -39,6 +41,10 @@ not a map.*
   direction and altitude, with a little arrow if it's climbing or descending.
 - 📋 **A list of the next ones**, closest first, with altitude colors from green (low) to purple (high).
 - 📡 **A radar-style scope** with you at the center, nearby airports, and a short trail behind every aircraft.
+- 🏙️ **City names instead of airport codes** (optional, beta native screensaver): for example, Chicago
+  to Tampa instead of ORD to TPA.
+- 🌤️ **Your weather under the clock** (optional, beta native screensaver): temperature, conditions
+  and wind from a Home Assistant weather entity.
 - 🌙 **A quiet-sky screen** for when nothing is around, and a clock in the corner.
 - 🔒 **Private by default:** your exact location stays on your device. See Privacy below.
 
@@ -47,12 +53,9 @@ or both. No account or key needed.
 
 ## 📱 Supported devices
 
-| | |
-|---|---|
-| **Needs** | Kiosk Satellite with plugin support (plugin API version 1) on Android 7.0 or newer. The beta native screensaver needs Kiosk Satellite 2026.10.35 or newer |
-| **Tested on** | Echo Show 5 (960 × 480) |
-| **Should work on** | Landscape and portrait screens of any shape: the layout rescales (wide, 16:10, 4:3, square) and stacks when the screen is taller than wide. The layout maths is tested against sizes from 800 × 480 to 2560 × 1600, such as 1280 × 800 (Echo Show 8, Meta Portal) and 1920 × 1200 tablets; only the Echo Show 5 has been looked at on real hardware. |
+Requires Kiosk Satellite 2026.10.23 or newer (2026.10.35 for the beta native screensaver).
 
+Layouts rescale to landscape and portrait screens of any shape, from 800 × 480 up to 2560 × 1600.
 Tried it on something else? Please report how it looks.
 
 <table>
@@ -97,12 +100,8 @@ screensaver shows* permission only to read which mode that is. Start the screens
 you should see aircraft, or "Quiet sky" if nothing is in range. Turn on **Demo: quiet sky** if you
 want to see the empty screen on purpose.
 
-Two Kiosk Satellite settings can get in the way:
-
-- **Its screensaver schedule wins.** A schedule that picks a screensaver by time of day overrides
-  this plugin during those hours. Turn the schedule off or leave gaps in it.
-- **Its clock and weather widgets draw on top.** The plugin has its own clock in the top right,
-  so switch those widgets off for the screensaver. Pixel shift can stay on.
+One Kiosk Satellite setting can get in the way: **its screensaver schedule wins.** A schedule that picks a
+screensaver by time of day overrides this plugin during those hours. Turn the schedule off or leave gaps in it.
 
 ## 👀 What's on the screen
 
@@ -115,6 +114,8 @@ Two Kiosk Satellite settings can get in the way:
 - **Scope:** a radar-style view centered on the location you entered, with nearby airports marked.
   The closest aircraft gets a yellow circle.
 - **Bottom left:** the data feed source (local feed, internet feed, or both).
+- **Weather (optional):** with **Show weather** on in the beta native screensaver, one line under the
+  clock shows the parts you chose, for example `83° Partly cloudy · NE 10 mph`.
 
 ### 🧭 About the routes
 
@@ -158,8 +159,22 @@ Open the plugin's row in Plugin Manager. Changes apply straight away.
 | Featured aircraft hold (s) | 90 | Longest the top band keeps one aircraft while others are in range, 10 to 300. A clearly closer aircraft can still take it sooner. |
 | Rows | 4 | List rows under the top band, 1 to 4. |
 | Radar position (portrait only) | Top | **Top**: under the featured aircraft. **Bottom**: below the list. Landscape ignores it. |
+| Show city names | Off | Show the route as city names (for example Chicago to Tampa) instead of airport codes, where the line has room. The text shrinks a little to fit, down to 85 %; otherwise the codes show. Needs the beta (native) screensaver. |
 | Hide general aviation | off | Hides light aircraft, helicopters and bare-registration callsigns. |
 | Demo: quiet sky | off | Always shows the empty-sky screen. |
+
+**🌤️ Weather**
+
+| Setting | Default | What it does |
+|---|---|---|
+| Show weather | Off | Show the current weather under the clock, from a Home Assistant weather entity. Needs the beta (native) screensaver. |
+| Weather entity | (none) | The Home Assistant weather entity to show, such as `weather.home`. Required for the weather line. Temperature and wind show in the units that entity uses. |
+| Temperature | On | Show the temperature in the weather line. |
+| Conditions | Icon and word | How the conditions (Sunny, Rain) show: **Icon and word**, **Word only**, **Icon only** or **Off**. |
+| Wind | Off | Add the wind to the line: **Speed**, or **Speed and direction** (for example `NW 8 mph`). It is the first thing dropped when the line is too long. |
+
+The rows after Show weather appear only while it is on. If the line is too long for the screen it gives way
+in this order: wind direction, wind, the condition word. The temperature stays.
 
 **📡 Sources**
 
@@ -211,6 +226,8 @@ those in from lookups a few seconds later. A new row can change as details arriv
 - **adsb.lol** gets your location rounded to two decimals (about 1 km), with the radius plus
   1 nm, and sees your IP address. That applies whenever it's used: as primary, as the default
   fallback, or for the farther steps of Soft radius.
+- **Weather** comes from your own Home Assistant through Kiosk Satellite. The plugin makes no network
+  call for it and never sees your Home Assistant credentials.
 - **Aircraft lookups** (airline, type, route) send only an aircraft's hex code or callsign, never a
   location. Over weeks they add up to a list of the aircraft that fly near you.
 - No analytics, and nothing is contacted that isn't in [docs/DATA-SOURCES.md](docs/DATA-SOURCES.md).
@@ -228,6 +245,8 @@ those in from lookups a few seconds later. A new row can change as details arriv
 | Airline or type is blank at first | They fill in a few seconds after an aircraft appears. |
 | A route looks wrong | Routes are a best guess. See About the routes above. |
 | Kiosk Satellite's clock covers the corner | Switch off its clock and weather widgets for the screensaver. |
+| The weather line doesn't show | Show weather is on, a Weather entity is picked, and the beta (native) screensaver is selected? The entity needs a temperature, and a temperature unit the plugin knows. Wind needs a known wind unit too. If the entity is unavailable the line is left out. |
+| A city name looks odd | City names are matched from airport data, so a few airports show a nearby town or an old name. Open an issue with the airport code. |
 | Very dim at night | Kiosk Satellite's adaptive brightness may be turning the panel down. |
 
 The status line also shows what the plugin is up to, for example
@@ -248,7 +267,8 @@ What each service gives us, its terms and exactly what we send it are in
   [standing data](https://github.com/vradarserver/standing-data) (CC0).
 - Aircraft registration and type: [adsbdb.com](https://www.adsbdb.com), which credits PlaneBase.
   Queried live, not stored or republished.
-- Airports: [OurAirports](https://ourairports.com) (public domain), bundled with the plugin.
+- Airports and city names: [OurAirports](https://ourairports.com) (public domain) and the Virtual Radar
+  Server [standing data](https://github.com/vradarserver/standing-data) (CC0), bundled with the plugin.
 - Aircraft icons: ADS-B Radar for macOS, https://adsb-radar.com.
 
 These are free community services, so the plugin keeps its requests small (one lookup per second

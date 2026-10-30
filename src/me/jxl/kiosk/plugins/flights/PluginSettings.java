@@ -2,6 +2,7 @@
 package me.jxl.kiosk.plugins.flights;
 
 import java.util.Map;
+import me.jxl.kiosk.plugins.flights.weather.HaWeatherSource;
 
 /**
  * Turns the host's settings map into a Config and source choices, or an error to show the
@@ -17,6 +18,15 @@ public final class PluginSettings {
   public final String primary, fallback, localUrl;
   public final long refreshMs;
 
+  /** The `weather.*` entity to show, or empty when "Show weather" is off or no entity is chosen. */
+  public final String weatherEntity;
+
+  /** Null when weather is fine or off; otherwise why the line will not show (no values echoed). */
+  public final String weatherProblem;
+
+  /** Weather pieces to show ({@link Weather#show} letters); never empty when an entity is set. */
+  public final String weatherShow;
+
   /** Null when the settings are usable; otherwise a message safe to show (no values echoed). */
   public final String error;
 
@@ -26,12 +36,18 @@ public final class PluginSettings {
       String fallback,
       String localUrl,
       long refreshMs,
+      String weatherEntity,
+      String weatherProblem,
+      String weatherShow,
       String error) {
     this.config = config;
     this.primary = primary;
     this.fallback = fallback;
     this.localUrl = localUrl;
     this.refreshMs = refreshMs;
+    this.weatherEntity = weatherEntity;
+    this.weatherProblem = weatherProblem;
+    this.weatherShow = weatherShow;
     this.error = error;
   }
 
@@ -75,9 +91,34 @@ public final class PluginSettings {
             clockCode(str(m.get("clockFormat"), "Device default")),
             (int) num(m.get("textSize"), 100, 80, 125),
             (int) num(m.get("featureHoldSec"), 90, 10, 300),
-            "Bottom".equals(str(m.get("radarPosition"), "Top")));
+            "Bottom".equals(str(m.get("radarPosition"), "Top")),
+            Boolean.TRUE.equals(m.get("cityNames")));
+    String entity = str(m.get("weatherEntity"), "").trim(), wxProblem = null;
+    String wxShow =
+        (flag(m.get("weatherTemp"), true) ? "t" : "")
+            + conditionPieces(str(m.get("weatherConditions"), "Icon and word"))
+            + windPieces(str(m.get("weatherWind"), "Off"));
+    if (!Boolean.TRUE.equals(m.get("showWeather"))) {
+      entity = "";
+    } else if (wxShow.isEmpty()) {
+      entity = "";
+      wxProblem = "Show weather is on but temperature, conditions and wind are all off";
+    } else if (entity.isEmpty()) {
+      wxProblem = "Show weather is on but no weather entity is chosen";
+    } else if (!HaWeatherSource.valid(entity)) {
+      entity = "";
+      wxProblem = "The weather entity must be a weather.* entity";
+    }
     return new PluginSettings(
-        c, primary, fallback, url, (long) num(m.get("refreshSec"), 10, 5, 60) * 1000L, err);
+        c,
+        primary,
+        fallback,
+        url,
+        (long) num(m.get("refreshSec"), 10, 5, 60) * 1000L,
+        entity,
+        wxProblem,
+        wxShow,
+        err);
   }
 
   private static String clockCode(String label) {
@@ -103,6 +144,37 @@ public final class PluginSettings {
     } catch (NumberFormatException e) {
       return null; // empty or typo: reported as the "set your home" message, without the value
     }
+  }
+
+  /** The `Conditions` select as {@link Weather#show} letters: c (word), i (icon). */
+  private static String conditionPieces(String choice) {
+    switch (choice) {
+      case "Word only":
+        return "c";
+      case "Icon only":
+        return "i";
+      case "Off":
+        return "";
+      default: // "Icon and word", and anything unrecognised (a value from another version)
+        return "ci";
+    }
+  }
+
+  /** The `Wind` select as {@link Weather#show} letters: w (speed), d (direction). */
+  private static String windPieces(String choice) {
+    switch (choice) {
+      case "Speed":
+        return "w";
+      case "Speed and direction":
+        return "wd";
+      default: // "Off", and anything unrecognised
+        return "";
+    }
+  }
+
+  /** A boolean setting; the default when the host sent nothing (a build from before it existed). */
+  private static boolean flag(Object o, boolean dflt) {
+    return o instanceof Boolean ? (Boolean) o : dflt;
   }
 
   private static String str(Object o, String dflt) {

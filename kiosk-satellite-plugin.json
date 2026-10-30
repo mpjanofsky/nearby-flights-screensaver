@@ -2,9 +2,10 @@
   "schemaVersion": 1,
   "id": "nearby-flights",
   "name": "Nearby Flights",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "apiVersion": 1,
   "minAndroidSdk": 24,
+  "minAppVersion": "2026.10.23",
   "entryClass": "me.jxl.kiosk.plugins.flights.FlightsPlugin",
   "description": "Nearby Flights screensaver: a list and a scope of the aircraft overhead, from your own receiver or adsb.lol.",
   "author": "Mike Janofsky",
@@ -137,6 +138,14 @@
       "description": "Top: under the featured aircraft. Bottom: below the list."
     },
     {
+      "key": "cityNames",
+      "title": "Show city names",
+      "type": "boolean",
+      "default": false,
+      "group": "Display",
+      "description": "Show the route as city names (for example Chicago to Tampa) where they fit, instead of airport codes. Falls back to codes when the line is too long or the airport has no city. Beta (native) screensaver only."
+    },
+    {
       "key": "excludeGa",
       "title": "Hide general aviation",
       "type": "boolean",
@@ -196,6 +205,73 @@
       "default": 10,
       "group": "Sources",
       "description": "Seconds between position updates."
+    },
+    {
+      "key": "showWeather",
+      "title": "Show weather",
+      "type": "boolean",
+      "default": false,
+      "group": "Weather",
+      "description": "Show the current weather under the clock, from the Home Assistant weather entity chosen below. Beta (native) screensaver only."
+    },
+    {
+      "key": "weatherEntity",
+      "title": "Weather entity",
+      "type": "entity",
+      "default": "",
+      "group": "Weather",
+      "visibleWhen": {
+        "key": "showWeather",
+        "equals": true
+      },
+      "description": "A Home Assistant weather entity, such as weather.home. Shows in the same unit as the weather entity."
+    },
+    {
+      "key": "weatherTemp",
+      "title": "Temperature",
+      "type": "boolean",
+      "default": true,
+      "group": "Weather",
+      "visibleWhen": {
+        "key": "showWeather",
+        "equals": true
+      },
+      "description": "Show the temperature in the weather line."
+    },
+    {
+      "key": "weatherConditions",
+      "title": "Conditions",
+      "type": "select",
+      "options": [
+        "Icon and word",
+        "Word only",
+        "Icon only",
+        "Off"
+      ],
+      "default": "Icon and word",
+      "group": "Weather",
+      "visibleWhen": {
+        "key": "showWeather",
+        "equals": true
+      },
+      "description": "How the conditions (Sunny, Rain) show in the weather line: a small icon, the word, both or neither."
+    },
+    {
+      "key": "weatherWind",
+      "title": "Wind",
+      "type": "select",
+      "options": [
+        "Off",
+        "Speed",
+        "Speed and direction"
+      ],
+      "default": "Off",
+      "group": "Weather",
+      "visibleWhen": {
+        "key": "showWeather",
+        "equals": true
+      },
+      "description": "Add the wind to the weather line, in the unit of the weather entity. It is the first thing dropped when the line is too long."
     }
   ]
 }

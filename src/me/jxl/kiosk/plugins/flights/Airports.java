@@ -3,7 +3,9 @@ package me.jxl.kiosk.plugins.flights;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Bundled airport list (OurAirports subset, see scripts/gen-airports.py), filtered to the radius
@@ -27,12 +29,21 @@ public final class Airports {
   private final String[] codes;
   private final double[] lat, lon;
   private final int[] size;
+  private final Map<String, String> cities = new HashMap<>();
+
+  private static Airports shared;
+
+  /** The bundled table, parsed once; the encoder and the engine both read it. */
+  public static synchronized Airports shared() {
+    if (shared == null) shared = new Airports();
+    return shared;
+  }
 
   public Airports() {
     this(AirportData.records());
   }
 
-  /** Records are "CODE lat lon size" joined by ';'. */
+  /** Records are "CODE lat lon size" or "CODE lat lon size|City", joined by ';'. */
   Airports(String records) {
     String[] rec = records.isEmpty() ? new String[0] : records.split(";");
     codes = new String[rec.length];
@@ -40,12 +51,38 @@ public final class Airports {
     lon = new double[rec.length];
     size = new int[rec.length];
     for (int i = 0; i < rec.length; i++) {
-      String[] f = rec[i].split(" ");
+      int bar = rec[i].indexOf('|');
+      String[] f = (bar < 0 ? rec[i] : rec[i].substring(0, bar)).split(" ");
       codes[i] = f[0];
       lat[i] = Double.parseDouble(f[1]);
       lon[i] = Double.parseDouble(f[2]);
       size[i] = Integer.parseInt(f[3]);
+      if (bar >= 0) cities.put(codes[i], rec[i].substring(bar + 1));
     }
+  }
+
+  /** The city an airport code serves, or null when the table has none. */
+  public String city(String code) {
+    return code == null ? null : cities.get(code);
+  }
+
+  /**
+   * A route string ("LGW" or "LGW → AGP", with stops "A → B → C") with each code replaced by its
+   * city. A code with no city stays as it is. Null when no code in the route has a city, so the
+   * caller sends nothing and the renderer keeps the codes.
+   */
+  public String cityRoute(String route) {
+    if (route == null) return null;
+    String[] parts = route.split(" \u2192 ");
+    StringBuilder out = new StringBuilder();
+    boolean any = false;
+    for (int i = 0; i < parts.length; i++) {
+      String city = city(parts[i]);
+      any |= city != null;
+      if (i > 0) out.append(" \u2192 ");
+      out.append(city != null ? city : parts[i]);
+    }
+    return any ? out.toString() : null;
   }
 
   /**
