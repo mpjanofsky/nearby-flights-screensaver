@@ -14,6 +14,23 @@ public final class PluginSettings {
       BOTH = "Local + adsb.lol",
       NONE = "None";
 
+  /** Settings that only the weather line reads; changing them never needs a new engine. */
+  private static final java.util.Set<String> WEATHER_KEYS =
+      new java.util.HashSet<>(
+          java.util.Arrays.asList(
+              "showWeather", "weatherEntity", "weatherTemp", "weatherConditions", "weatherWind"));
+
+  /**
+   * The settings with the weather ones left out. When two maps give equal keys, only the weather
+   * differs, so the engine (and the aircraft it already holds) can stay while the weather source is
+   * swapped. Rebuilding it would blank the screen until the first fetch lands.
+   */
+  public static Map<String, Object> engineKey(Map<String, Object> settings) {
+    Map<String, Object> k = new java.util.HashMap<>(settings);
+    k.keySet().removeAll(WEATHER_KEYS);
+    return k;
+  }
+
   public final Config config;
   public final String primary, fallback, localUrl;
   public final long refreshMs;

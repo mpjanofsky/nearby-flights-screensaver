@@ -319,4 +319,17 @@ class PluginSettingsTest {
     assertNotNull(s.weatherProblem);
     assertNull(s.error); // the flights still run
   }
+
+  @Test
+  void weatherEditsKeepTheEngineKey() {
+    Map<String, Object> a = ok(), b = ok();
+    b.put("showWeather", true);
+    b.put("weatherEntity", "weather.home");
+    b.put("weatherTemp", false);
+    b.put("weatherConditions", "Off");
+    b.put("weatherWind", "Speed");
+    assertEquals(PluginSettings.engineKey(a), PluginSettings.engineKey(b));
+    b.put("radiusNm", 20);
+    assertFalse(PluginSettings.engineKey(a).equals(PluginSettings.engineKey(b)));
+  }
 }

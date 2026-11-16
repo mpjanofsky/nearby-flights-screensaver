@@ -38,3 +38,4 @@ tools/lib/
 
 # Review screenshots (regenerate with scripts/review-screens.mjs)
 private/docs/review/screens/
+.local/

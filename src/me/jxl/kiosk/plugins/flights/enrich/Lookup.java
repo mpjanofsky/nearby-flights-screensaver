@@ -12,6 +12,19 @@ public interface Lookup {
   Info route(String callsign) throws IOException;
 
   /**
+   * Routes for several callsigns in one go, keyed by callsign. A callsign with no route is absent
+   * (a miss). The default asks one at a time; a source with a batch API overrides it.
+   */
+  default java.util.Map<String, Info> routes(java.util.List<String> callsigns) throws IOException {
+    java.util.Map<String, Info> out = new java.util.HashMap<>();
+    for (String cs : callsigns) {
+      Info i = route(cs);
+      if (i != null) out.put(cs, i);
+    }
+    return out;
+  }
+
+  /**
    * The airline for an ICAO operator code (name only, in {@link Info#airlineName}). The default is
    * a miss, so a source that cannot answer needs no code.
    */

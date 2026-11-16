@@ -7,13 +7,17 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * adsb.im route-by-callsign: far closer to real positions than adsbdb's. A request carries only the
- * callsign. An unknown callsign is a 200 with the string "unknown", which is a miss. It has no hex
- * lookup, so {@link MergedHexLookup} pairs it with adsbdb and adsb.lol for that.
+ * adsb.im routes by callsign: far closer to real positions than adsbdb's. Uses its batch endpoint
+ * (POST /api/0/routeset), which the API description asks feeders to use: callsigns are grouped by
+ * the {@link Enricher} for at least 30 s per request. A request carries only callsigns. An unknown
+ * callsign is a null or "unknown" entry, which is a miss. It has no hex lookup, so {@link
+ * MergedHexLookup} pairs it with adsbdb and adsb.lol for that.
  */
 public final class AdsbImRoutes implements Lookup {
-  private static final String BASE = "https://adsb.im/api/0/route/";
-  // The route endpoint answered in a steady 5.2 s on 2026-10-26, which a 5 s timeout never got.
+  // Plain http on purpose: adsb.im's API description asks for it ("only available over http and
+  // not https to reduce server load") and answers 403 to the per-callsign GET. Only callsigns go
+  // out (no lat/lng, no location), so there is nothing private to protect on the wire.
+  static final String URL = "http://adsb.im/api/0/routeset";
   private static final int TIMEOUT_MS = 15_000;
   private final String userAgent;
 
@@ -28,8 +32,58 @@ public final class AdsbImRoutes implements Lookup {
 
   @Override
   public Info route(String callsign) throws IOException {
-    String body = Http.get(BASE + callsign, userAgent, "adsb.im", TIMEOUT_MS);
-    return body == null ? null : parseRoute(body);
+    return routes(java.util.Collections.singletonList(callsign)).get(callsign);
+  }
+
+  @Override
+  public java.util.Map<String, Info> routes(java.util.List<String> callsigns) throws IOException {
+    java.util.Map<String, Info> out = new java.util.HashMap<>();
+    if (callsigns.isEmpty()) return out;
+    String body = Http.postJson(URL, requestBody(callsigns), userAgent, "adsb.im", TIMEOUT_MS);
+    if (body == null) throw new IOException("adsb.im routeset not found");
+    parseRoutes(body, callsigns, out);
+    return out;
+  }
+
+  /** Pure. The JSON for a batch: callsigns only, never a position. */
+  static String requestBody(java.util.List<String> callsigns) {
+    JSONArray planes = new JSONArray();
+    for (String cs : callsigns) {
+      try {
+        planes.put(new JSONObject().put("callsign", cs));
+      } catch (JSONException e) {
+        throw new IllegalStateException(e); // a plain string key and value cannot fail
+      }
+    }
+    try {
+      return new JSONObject().put("planes", planes).toString();
+    } catch (JSONException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
+   * Pure. The answer is an array in the order asked. A length mismatch means we cannot tell which
+   * answer belongs to which callsign, so it fails the whole batch (the caller backs off).
+   */
+  static void parseRoutes(
+      String body, java.util.List<String> asked, java.util.Map<String, Info> out)
+      throws IOException {
+    JSONArray arr;
+    try {
+      arr = new JSONArray(body);
+    } catch (JSONException e) {
+      throw new IOException("adsb.im routeset response is not a JSON array", e);
+    }
+    if (arr.length() != asked.size()) {
+      throw new IOException("adsb.im routeset answered " + arr.length() + " for " + asked.size());
+    }
+    for (int i = 0; i < arr.length(); i++) {
+      JSONObject o = arr.optJSONObject(i); // null or "unknown" is a miss
+      if (o == null) continue;
+      Info info = parseRoute(o);
+      if (info != null) out.put(asked.get(i), info);
+    }
   }
 
   /** Longest chain shown in full; a longer one is shortened to its first and last airport. */
@@ -48,6 +102,11 @@ public final class AdsbImRoutes implements Lookup {
     } catch (JSONException e) {
       throw new IOException("adsb.im response is not JSON", e);
     }
+    return parseRoute(r);
+  }
+
+  /** As {@link #parseRoute(String)}, for one entry of a batch answer. */
+  static Info parseRoute(JSONObject r) {
     JSONArray ap = r.optJSONArray("_airports");
     if (ap == null || ap.length() < 2) return null;
     int n = ap.length();

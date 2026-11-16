@@ -41,6 +41,13 @@ public final class FlightsPlugin implements KioskPlugin {
   private PluginHost host;
   private ScheduledExecutorService worker;
   private Map<String, Object> applied;
+
+  /** Why the weather line will not show (null: fine or off); part of the status line. */
+  private volatile String weatherProblem;
+
+  /** The settings the running engine was built from, weather left out; null: none running. */
+  private Map<String, Object> engineKey;
+
   private volatile Engine engine;
   private static final long SUMMARY_EVERY_MS = 5 * 60_000L;
   private long lastSummaryMs;
@@ -211,16 +218,19 @@ public final class FlightsPlugin implements KioskPlugin {
   public synchronized void configure(Map<String, Object> settings) {
     if (settings.equals(applied)) return; // each edit re-sends everything; skip no-ops
     applied = new HashMap<>(settings);
+    PluginSettings s = PluginSettings.parse(settings);
+    Map<String, Object> key = PluginSettings.engineKey(settings);
+    if (engineKey != null && key.equals(engineKey)) {
+      // Only weather settings changed: keep the engine and its aircraft, swap the weather source.
+      startWeather(s);
+      return;
+    }
+    engineKey = key;
     stopWorker();
     stopEnricher();
-    PluginSettings s = PluginSettings.parse(settings);
-    if (weatherSource != null)
-      weatherSource.close(); // the entity changed, or weather was turned off
-    weatherSource = null;
-    latestWeather = null;
-    if (s.weatherProblem != null) host.log(s.weatherProblem);
     if (s.error != null) {
       engine = null;
+      startWeather(s); // closes the old source and logs the problem
       host.status(s.error, true);
       // Say so on the screen too, instead of leaving the last screen to count up as stale.
       publish(PayloadEncoder.message(s.error, System.currentTimeMillis()), 0);
@@ -251,18 +261,8 @@ public final class FlightsPlugin implements KioskPlugin {
             },
             s.refreshMs,
             enricher);
-    if (!s.weatherEntity.isEmpty()) {
-      WeatherSource ws = new HaWeatherSource(host, s.weatherEntity);
-      weatherSource = ws;
-      // The listener runs on the host's callback thread; the engine reads it at its next refresh.
-      ws.start(
-          w -> {
-            Weather shown = w == null ? null : w.showing(s.weatherShow);
-            latestWeather = shown;
-            Engine e = engine;
-            if (e != null) e.setWeather(shown);
-          });
-    }
+    // After the engine exists: the host delivers the first snapshot at once, and it must land here.
+    startWeather(s);
     // Daemon thread: a stuck request must never hold up the host's 3 s lifecycle deadline.
     worker =
         Executors.newSingleThreadScheduledExecutor(
@@ -275,6 +275,32 @@ public final class FlightsPlugin implements KioskPlugin {
     loopParked = paused;
     ++generation;
     if (!paused) schedule(generation, 0);
+  }
+
+  /**
+   * (Re)starts the weather source for these settings, closing the old one first. The engine, if
+   * there is one, is told there is no weather until the new source delivers its snapshot.
+   */
+  private void startWeather(PluginSettings s) {
+    if (weatherSource != null)
+      weatherSource.close(); // the entity changed, or weather was turned off
+    weatherSource = null;
+    latestWeather = null;
+    Engine old = engine;
+    if (old != null) old.setWeather(null);
+    weatherProblem = s.weatherProblem;
+    if (s.weatherProblem != null) host.log(s.weatherProblem);
+    if (s.error != null || s.weatherEntity.isEmpty()) return;
+    WeatherSource ws = new HaWeatherSource(host, s.weatherEntity);
+    weatherSource = ws;
+    // The listener runs on the host's callback thread; the engine reads it at its next refresh.
+    ws.start(
+        w -> {
+          Weather shown = w == null ? null : w.showing(s.weatherShow);
+          latestWeather = shown;
+          Engine e = engine;
+          if (e != null) e.setWeather(shown);
+        });
   }
 
   private static SourceAdapter NONE_OR(String name, String url, NetCooldown net) {
@@ -383,6 +409,9 @@ public final class FlightsPlugin implements KioskPlugin {
     String out = p == null ? text : text + " | Screensaver not registered (" + p + ")";
     String nativeStats = nativeStats();
     if (nativeStats != null) out += " | " + nativeStats;
+    if (weatherProblem != null) out += " | Weather: " + weatherProblem;
+    else if (weatherSource != null && latestWeather == null)
+      out += " | Weather: waiting for the entity's data";
     if (m != null) return out + " | Cannot tell which screensaver shows (" + m + ")";
     return modeLabel == null || paused ? out : out + " | Screensaver: " + modeLabel;
   }
@@ -419,6 +448,7 @@ public final class FlightsPlugin implements KioskPlugin {
     loopParked = false;
     weatherSource = null; // the host has revoked its subscription; start() subscribes again
     latestWeather = null;
+    engineKey = null;
     applied = null; // a later start() with unchanged settings must rebuild, not skip as a no-op
     stopWorker();
     stopEnricher();

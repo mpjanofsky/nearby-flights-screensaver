@@ -2,9 +2,11 @@
 package me.jxl.kiosk.plugins.flights.enrich;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import me.jxl.kiosk.plugins.flights.Geo;
@@ -38,6 +40,27 @@ public final class Enricher {
 
   static final int DEFAULT_PRIORITY = 50;
   static final long MIN_GAP_MS = 1_000, MAX_BACKOFF_MS = 60_000L;
+
+  /**
+   * Route lookups are batched, as adsb.im's API description asks: callsigns wait this long (at
+   * least) before one request carries them, and two requests are at least this far apart. Hex and
+   * airline lookups are not batched.
+   */
+  static final long ROUTE_WINDOW_MS = 30_000L;
+
+  /** After repeated failures the route service is tried this seldom (window, then doubling). */
+  static final long ROUTE_MAX_BACKOFF_MS = 600_000L;
+
+  /** Most callsigns in one request. */
+  static final int MAX_BATCH = 20;
+
+  private static final Set<Map.Entry<String, Integer>> NONE = java.util.Collections.emptySet();
+
+  /**
+   * After the route service refuses us (HTTP 401/403/410: blocked or discontinued) it is left alone
+   * this long, since asking again sooner cannot help and would only add load.
+   */
+  static final long BLOCKED_BACKOFF_MS = 3_600_000L;
 
   private static final class Cached {
     final Info info; // null = the service said "unknown"
@@ -78,6 +101,12 @@ public final class Enricher {
   private final long[] svcNotBefore = new long[3];
 
   private final int[] svcFailures = new int[3];
+
+  private final long routeWindowMs;
+
+  /** When the oldest waiting route callsign was queued (the batch opens then); -1 when none. */
+  private long routeQueuedMs = -1;
+
   private Thread thread;
 
   public EnrichStats stats() {
@@ -85,7 +114,13 @@ public final class Enricher {
   }
 
   public Enricher(Lookup lookup) {
+    this(lookup, ROUTE_WINDOW_MS);
+  }
+
+  /** Tests pass a short window; the shipped one is {@link #ROUTE_WINDOW_MS}. */
+  Enricher(Lookup lookup, long routeWindowMs) {
     this.lookup = lookup;
+    this.routeWindowMs = routeWindowMs;
   }
 
   /**
@@ -293,6 +328,7 @@ public final class Enricher {
   private Info cached(String key, long nowMs, int priority) {
     Cached e = cache.get(key);
     if (e == null || e.expiresMs <= nowMs) {
+      if (key.startsWith("c:") && routeQueuedMs < 0) routeQueuedMs = nowMs;
       pending.merge(key, priority, Math::min);
       notifyAll();
     }
@@ -312,8 +348,15 @@ public final class Enricher {
   /** Ms until the earliest queued request may go: the gap and its own service's backoff. */
   private long wakeIn(long nowMs) {
     long at = Long.MAX_VALUE;
-    for (String k : pending.keySet()) at = Math.min(at, svcNotBefore[service(k)]);
+    for (String k : pending.keySet()) {
+      at = Math.min(at, k.startsWith("c:") ? routeDueMs() : svcNotBefore[service(k)]);
+    }
     return Math.max(notBeforeMs, at) - nowMs;
+  }
+
+  /** When the waiting route callsigns may go out: after the window, and after any backoff. */
+  private long routeDueMs() {
+    return Math.max(routeQueuedMs + routeWindowMs, svcNotBefore[1]);
   }
 
   /**
@@ -322,21 +365,31 @@ public final class Enricher {
    */
   public long step(long nowMs) {
     String key;
+    List<String> batch = null;
     synchronized (this) {
       if (pending.isEmpty()) return -1;
       if (nowMs < notBeforeMs) return wakeIn(nowMs);
       key = null;
+      if (routeQueuedMs >= 0 && nowMs >= routeDueMs()) {
+        batch = takeRouteBatch(nowMs);
+      }
       int best = Integer.MAX_VALUE;
-      for (Map.Entry<String, Integer> e : pending.entrySet()) { // small queue: a scan is enough
+      for (Map.Entry<String, Integer> e :
+          batch != null && !batch.isEmpty() ? NONE : pending.entrySet()) {
+        if (e.getKey().startsWith("c:")) continue; // routes go out in batches, above
         if (svcNotBefore[service(e.getKey())] > nowMs) continue; // that service is backing off
         if (e.getValue() < best) {
           best = e.getValue();
           key = e.getKey();
         }
       }
-      if (key == null) return wakeIn(nowMs); // everything queued belongs to a backing-off service
-      pending.remove(key);
+      if (batch != null && batch.isEmpty()) batch = null;
+      if (batch == null) {
+        if (key == null) return wakeIn(nowMs); // everything queued belongs to a backing-off service
+        pending.remove(key);
+      }
     }
+    if (batch != null) return routeBatch(batch, nowMs);
     Info found;
     boolean hex = key.startsWith("h:"), airline = key.startsWith("a:");
     long t0 = System.nanoTime();
@@ -375,6 +428,75 @@ public final class Enricher {
       // A callsign belongs to one flight, so an entry carrying one is not trusted for 12 h.
       long ttl = found == null ? MISS_TTL_MS : found.callsign != null ? CALLSIGN_TTL_MS : TTL_MS;
       cache.put(key, new Cached(found, nowMs + ttl));
+      notBeforeMs = nowMs + MIN_GAP_MS;
+      stats.queue(pending.size());
+      return pending.isEmpty() ? -1 : MIN_GAP_MS;
+    }
+  }
+
+  /** The best-priority waiting route keys (callsigns, "c:" removed), taken off the queue. */
+  private List<String> takeRouteBatch(long nowMs) {
+    List<Map.Entry<String, Integer>> waiting = new ArrayList<>();
+    for (Map.Entry<String, Integer> e : pending.entrySet()) {
+      if (e.getKey().startsWith("c:")) waiting.add(e);
+    }
+    waiting.sort((a, b) -> Integer.compare(a.getValue(), b.getValue())); // stable: queue order
+    List<String> batch = new ArrayList<>();
+    for (Map.Entry<String, Integer> e : waiting) {
+      if (batch.size() == MAX_BATCH) break;
+      batch.add(e.getKey().substring(2));
+    }
+    for (String cs : batch) pending.remove("c:" + cs);
+    // Whatever did not fit starts a fresh window now, so the next request is a full window away.
+    routeQueuedMs = pending.keySet().stream().anyMatch(k -> k.startsWith("c:")) ? nowMs : -1;
+    return batch;
+  }
+
+  /**
+   * One batched route request, outside the lock. A failure puts every callsign back and backs the
+   * route service off; a refusal (blocked) leaves it alone for an hour. Either way the aircraft
+   * simply show no route meanwhile.
+   */
+  private long routeBatch(List<String> batch, long nowMs) {
+    Map<String, Info> found;
+    long t0 = System.nanoTime();
+    try {
+      found = lookup.routes(batch);
+    } catch (IOException e) {
+      // Safe to drop: the aircraft keep their feed fields and show no route. Requeue and back off.
+      stats.error(e);
+      long ms = (System.nanoTime() - t0) / 1_000_000;
+      stats.lookup(false, ms, EnrichStats.Outcome.ERROR, false);
+      synchronized (this) {
+        for (String cs : batch) pending.merge("c:" + cs, DEFAULT_PRIORITY, Math::min);
+        if (routeQueuedMs < 0) routeQueuedMs = nowMs;
+        svcFailures[1]++;
+        boolean refused =
+            e instanceof Http.StatusException
+                && (((Http.StatusException) e).code == 401
+                    || ((Http.StatusException) e).code == 403
+                    || ((Http.StatusException) e).code == 410);
+        long wait =
+            refused
+                ? BLOCKED_BACKOFF_MS
+                : Math.min(
+                    ROUTE_MAX_BACKOFF_MS,
+                    Math.max(MIN_GAP_MS, routeWindowMs) << Math.min(svcFailures[1], 10));
+        svcNotBefore[1] = nowMs + wait;
+        notBeforeMs = nowMs + MIN_GAP_MS;
+        return wakeIn(nowMs);
+      }
+    }
+    long ms = (System.nanoTime() - t0) / 1_000_000;
+    synchronized (this) {
+      for (String cs : batch) {
+        Info info = found.get(cs);
+        stats.lookup(
+            false, ms, info == null ? EnrichStats.Outcome.MISS : EnrichStats.Outcome.HIT, false);
+        cache.put("c:" + cs, new Cached(info, nowMs + (info == null ? MISS_TTL_MS : TTL_MS)));
+      }
+      svcFailures[1] = 0;
+      svcNotBefore[1] = nowMs + routeWindowMs; // the next request is a full window away
       notBeforeMs = nowMs + MIN_GAP_MS;
       stats.queue(pending.size());
       return pending.isEmpty() ? -1 : MIN_GAP_MS;

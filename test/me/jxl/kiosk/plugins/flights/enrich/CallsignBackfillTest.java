@@ -60,7 +60,7 @@ class CallsignBackfillTest {
             return null;
           }
         };
-    Enricher e = new Enricher(new MergedHexLookup(OWNER, live, routes(asked)));
+    Enricher e = new Enricher(new MergedHexLookup(OWNER, live, routes(asked)), 0);
     me.jxl.kiosk.plugins.flights.source.Aircraft a = EnricherTest.ac("ad44bc", null, null, null);
     assertNull(e.infoFor(a, 0).callsign);
     long now = EnricherTest.drain(e, 0); // the hex lookup

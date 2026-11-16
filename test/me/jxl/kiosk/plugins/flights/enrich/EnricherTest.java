@@ -55,7 +55,7 @@ class EnricherTest {
             return null;
           }
         };
-    Enricher e = new Enricher(owned);
+    Enricher e = new Enricher(owned, 0);
     Aircraft a = ac("ac7256", "N9006", null, null);
     assertNull(e.infoFor(a, 0).airlineIcao); // nothing known before the lookup
     drain(e, 0);
@@ -76,7 +76,7 @@ class EnricherTest {
             return null;
           }
         };
-    Enricher e = new Enricher(mil);
+    Enricher e = new Enricher(mil, 0);
     Aircraft a = ac("ae0375", null, null, null);
     e.infoFor(a, 0);
     drain(e, 0);
@@ -104,7 +104,7 @@ class EnricherTest {
             return new Info(null, null, icao, "Zed Air", null, null);
           }
         };
-    Enricher e = new Enricher(l);
+    Enricher e = new Enricher(l, 0);
     Aircraft a = ac("a516bc", "ZZQ27", null, null);
     assertNull(e.infoFor(a, 0).airlineName); // nothing known yet
     long now = drain(e, 0);
@@ -124,7 +124,7 @@ class EnricherTest {
   @Test
   void lookupsRunFeaturedFirstThenListThenPrefetch() {
     Fake f = new Fake();
-    Enricher e = new Enricher(f);
+    Enricher e = new Enricher(f, 0);
     e.infoFor(ac("late", null, "N1", "C172"), 0, 12); // prefetch candidate, queued first
     e.infoFor(ac("row", null, "N2", "C172"), 0, 2);
     e.infoFor(ac("feat", null, "N3", "C172"), 0, 0);
@@ -136,7 +136,7 @@ class EnricherTest {
   @Test
   void answersFromCacheAndNeverBlocks() {
     Fake f = new Fake();
-    Enricher e = new Enricher(f);
+    Enricher e = new Enricher(f, 0);
     Info first = e.infoFor(ac("a65454", "DAL800", null, null), 0);
     assertNull(first.origin);
     assertEquals("DAL", first.airlineIcao); // from the bundled table before any lookup
@@ -153,7 +153,7 @@ class EnricherTest {
   @Test
   void neverLooksUpARouteForNonAirlineCallsigns() {
     Fake f = new Fake();
-    Enricher e = new Enricher(f);
+    Enricher e = new Enricher(f, 0);
     e.infoFor(
         ac("a1", "N68GW", "N68GW", "C56X"), 0); // callsign is a tail number: owner lookup only
     e.infoFor(ac("a2", null, null, null), 0); // no callsign: only the hex lookup
@@ -164,7 +164,7 @@ class EnricherTest {
   @Test
   void oneRequestAtATimeWithAGap() {
     Fake f = new Fake();
-    Enricher e = new Enricher(f);
+    Enricher e = new Enricher(f, 0);
     e.infoFor(ac("a1", "DAL1", null, null), 0);
     assertTrue(e.step(0) == 1_000 || e.step(0) >= 0);
     assertEquals(1, f.calls.size());
@@ -176,7 +176,7 @@ class EnricherTest {
   void missesAreCachedForAnHourThenRetried() {
     Fake f = new Fake();
     f.unknown = true;
-    Enricher e = new Enricher(f);
+    Enricher e = new Enricher(f, 0);
     Aircraft a = ac("a1", "DAL1", "N1", "B738");
     e.infoFor(a, 0);
     long now = drain(e, 0);
@@ -192,7 +192,7 @@ class EnricherTest {
   void failuresBackOffAndKeepTheRequest() {
     Fake f = new Fake();
     f.fail = true;
-    Enricher e = new Enricher(f);
+    Enricher e = new Enricher(f, 0);
     e.infoFor(ac("a1", "DAL1", "N1", "B738"), 0);
     long w1 = e.step(0);
     assertTrue(w1 >= 2_000, "backoff grows from the first failure");
@@ -219,7 +219,7 @@ class EnricherTest {
             return new Info(null, null, "DAL", "Delta Air Lines", "DEN", "ATL");
           }
         };
-    Enricher e = new Enricher(hexDown);
+    Enricher e = new Enricher(hexDown, 0);
     e.infoFor(ac("a1", null, null, null), 0); // no callsign: wants a hex lookup, which fails
     e.infoFor(ac("a2", "DAL2", "N2", "B738"), 0); // wants a route lookup, which works
     long now = 0;
@@ -238,7 +238,7 @@ class EnricherTest {
   @Test
   void expiredEntriesAreServedWhileRefreshing() {
     Fake f = new Fake();
-    Enricher e = new Enricher(f);
+    Enricher e = new Enricher(f, 0);
     Aircraft a = ac("a1", "DAL1", "N1", "B738");
     e.infoFor(a, 0);
     drain(e, 0);
@@ -250,7 +250,7 @@ class EnricherTest {
   @Test
   void cacheIsBounded() {
     Fake f = new Fake();
-    Enricher e = new Enricher(f);
+    Enricher e = new Enricher(f, 0);
     long now = 0;
     for (int i = 0; i < Enricher.MAX_ENTRIES + 20; i++) {
       e.infoFor(ac("h" + i, null, null, null), now);
@@ -295,7 +295,7 @@ class EnricherTest {
   }
 
   static Info chainFor(Lookup l, Aircraft a) {
-    Enricher e = new Enricher(l);
+    Enricher e = new Enricher(l, 0);
     e.infoFor(a, 0);
     drain(e, 0);
     return e.infoFor(a, 5_000);
@@ -401,7 +401,7 @@ class EnricherTest {
 
   @Test
   void routeIsKeptWhenTheAircraftIsOnIt() {
-    Enricher e = new Enricher(new Positioned());
+    Enricher e = new Enricher(new Positioned(), 0);
     e.infoFor(at(30.0, -95.0), 0);
     drain(e, 0);
     Info i = e.infoFor(at(30.0, -95.0), 5_000); // near Houston, close to the FLL-LAX arc
@@ -411,7 +411,7 @@ class EnricherTest {
 
   @Test
   void routeIsDroppedWhenTheAircraftIsFarOffIt() {
-    Enricher e = new Enricher(new Positioned());
+    Enricher e = new Enricher(new Positioned(), 0);
     e.infoFor(at(47.0, -122.0), 0);
     drain(e, 0);
     Info i = e.infoFor(at(47.0, -122.0), 5_000); // Seattle: callsign reused for another leg
@@ -436,7 +436,7 @@ class EnricherTest {
   @Test
   void aRouteThatDoesNotFitTheAircraftIsDroppedWithoutAskingAgain() {
     Seattle l = new Seattle();
-    Enricher e = new Enricher(l);
+    Enricher e = new Enricher(l, 0);
     e.infoFor(at(30.0, -95.0), 0); // Texas: nowhere near Seattle-Portland
     drain(e, 0);
     Info i = e.infoFor(at(30.0, -95.0), 5_000);
@@ -447,7 +447,7 @@ class EnricherTest {
   @Test
   void aRouteThatFitsIsShown() {
     Seattle l = new Seattle();
-    Enricher e = new Enricher(l);
+    Enricher e = new Enricher(l, 0);
     e.infoFor(at(46.5, -122.4), 0); // between Seattle and Portland
     drain(e, 0);
     assertEquals("SEA", e.infoFor(at(46.5, -122.4), 5_000).origin);

@@ -67,4 +67,37 @@ class AdsbImRoutesTest {
   void nonJsonIsAFailureNotAMiss() {
     assertThrows(IOException.class, () -> AdsbImRoutes.parseRoute("<html>"));
   }
+
+  @Test
+  void batchRequestCarriesCallsignsOnly() throws Exception {
+    String body = AdsbImRoutes.requestBody(java.util.Arrays.asList("DAL800", "UAL12"));
+    org.json.JSONObject o = new org.json.JSONObject(body);
+    org.json.JSONArray planes = o.getJSONArray("planes");
+    assertEquals(2, planes.length());
+    assertEquals("DAL800", planes.getJSONObject(0).getString("callsign"));
+    assertEquals(1, planes.getJSONObject(1).length(), "no lat/lng or anything else is sent");
+    assertEquals("http://adsb.im/api/0/routeset", AdsbImRoutes.URL);
+  }
+
+  @Test
+  void batchAnswerIsMatchedByPositionAndMissesAreSkipped() throws IOException {
+    java.util.Map<String, Info> out = new java.util.HashMap<>();
+    AdsbImRoutes.parseRoutes(
+        "[" + ROUTE + ",null,\"unknown\"," + UNKNOWN + "]",
+        java.util.Arrays.asList("DAL800", "A1", "A2", "NOSUCH99"),
+        out);
+    assertEquals(1, out.size());
+    assertEquals("FLL", out.get("DAL800").origin);
+  }
+
+  @Test
+  void batchAnswerOfTheWrongLengthOrShapeFailsTheBatch() {
+    java.util.Map<String, Info> out = new java.util.HashMap<>();
+    assertThrows(
+        IOException.class,
+        () -> AdsbImRoutes.parseRoutes("[" + ROUTE + "]", java.util.Arrays.asList("A", "B"), out));
+    assertThrows(
+        IOException.class,
+        () -> AdsbImRoutes.parseRoutes("{\"detail\":\"x\"}", java.util.Arrays.asList("A"), out));
+  }
 }

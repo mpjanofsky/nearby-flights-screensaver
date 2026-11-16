@@ -65,4 +65,9 @@ public final class MergedHexLookup implements Lookup {
   public Info route(String callsign) throws IOException {
     return route.route(callsign);
   }
+
+  @Override
+  public java.util.Map<String, Info> routes(java.util.List<String> callsigns) throws IOException {
+    return route.routes(callsigns);
+  }
 }

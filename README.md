@@ -229,7 +229,9 @@ those in from lookups a few seconds later. A new row can change as details arriv
 - **Weather** comes from your own Home Assistant through Kiosk Satellite. The plugin makes no network
   call for it and never sees your Home Assistant credentials.
 - **Aircraft lookups** (airline, type, route) send only an aircraft's hex code or callsign, never a
-  location. Over weeks they add up to a list of the aircraft that fly near you.
+  location. Over weeks they add up to a list of the aircraft that fly near you. Route lookups go
+  to adsb.im over plain `http`, because its API asks for that, so a callsign is visible to your
+  network. They go out in batches, about one request every 30 seconds at most.
 - No analytics, and nothing is contacted that isn't in [docs/DATA-SOURCES.md](docs/DATA-SOURCES.md).
 
 ## 🧰 Troubleshooting
